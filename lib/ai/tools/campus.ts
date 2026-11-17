@@ -5,6 +5,8 @@ import { campusCardService } from "@/lib/campus/card-service";
 import { createForumPost, getOpenForumPostForLostItem, searchForumPosts } from "@/lib/campus/forum";
 import { forumCategories } from "@/lib/campus/forum-shared";
 import { searchCampusKnowledge } from "@/lib/campus/knowledge";
+import { getRagConfig } from "@/lib/rag/config";
+import { searchRag } from "@/lib/rag/search";
 import {
   closeOwnItem,
   createLostItem,
@@ -68,6 +70,34 @@ export function campusTools(userId: string, author = "同学") {
       description:
         "检索校园公开资料，包括奖学金、困难认定、补卡、请假、讲座、食堂、兼职和校历。回答校园办事或生活问题时必须先调用。",
       execute: async ({ query }) => {
+        // 优先走 RAG 知识库（lib/rag/documents 下的 PDF），内置文章仅在知识库不可用时兜底
+        try {
+          const rag = await searchRag(query, 5);
+          const minScore = getRagConfig().minScore;
+          const seen = new Set<string>();
+          const hits = rag.hits
+            .filter((hit) => hit.score >= minScore)
+            .filter((hit) => {
+              // 相邻分块常有重叠内容，按片段文本去重
+              if (seen.has(hit.snippet)) return false;
+              seen.add(hit.snippet);
+              return true;
+            })
+            .slice(0, 3);
+          if (hits.length > 0) {
+            return {
+              articles: hits.map((hit) => ({
+                body: hit.snippet,
+                civic: "",
+                source: hit.doc,
+                title: `${hit.doc} · 第 ${hit.chunkIndex + 1} 段`,
+              })),
+              found: true,
+            };
+          }
+        } catch {
+          /* 知识库不可用时回退到内置文章 */
+        }
         const articles = searchCampusKnowledge(query);
         return {
           articles: articles.map((article) => ({
