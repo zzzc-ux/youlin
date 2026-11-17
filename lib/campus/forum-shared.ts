@@ -14,4 +14,6 @@ export type ForumPost = {
   createdAt: string;
   lostItemId?: string | null;
   lostItemStatus?: "open" | "closed" | null;
+  /** 服务端计算：当前请求用户是否为帖子作者 */
+  mine?: boolean;
 };

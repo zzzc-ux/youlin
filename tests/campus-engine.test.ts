@@ -4,10 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { routeCampus, runCampusEngine } from "../lib/campus/engine";
-import { listOpenItems, searchLostByText } from "../lib/campus/lost-found";
+import { createLostItem, listOpenItems, searchLostByText } from "../lib/campus/lost-found";
 import { createDatabase } from "../lib/db/client";
 import { searchRepairs } from "../lib/campus/repairs";
-import { createForumPost, getForumPostById, listForumPosts, searchForumPosts } from "../lib/campus/forum";
+import { createForumPost, deleteForumPost, getForumPostById, listForumPosts, listForumPostsByUser, searchForumPosts, updateForumPost } from "../lib/campus/forum";
 import { sql } from "drizzle-orm";
 import type { CampusTraceStep } from "../lib/types";
 import { getClaimConversations, sendClaimMessage } from "../lib/campus/claims";
@@ -174,6 +174,56 @@ test("登记、取消、并发确认及精确关闭只作用于目标记录", as
     await db.execute(sql`INSERT INTO "ForumPost" ("userId", "author", "category", "title", "body", "createdAt") SELECT ${userId}, '测试', '活动', '后续帖子', '后续内容', now() + interval '1 day' FROM generate_series(1, 81)`);
     assert.equal((await listForumPosts()).some((post) => post.id === posts[0].id), false);
     assert.equal((await getForumPostById(posts[0].id))?.id, posts[0].id);
+  } finally {
+    const db = await createDatabase();
+    await (db as unknown as { $client: { close: () => Promise<void> } }).$client.close();
+    (globalThis as Record<string, unknown>).chatbotDb = undefined;
+    process.chdir(original);
+    if (originalPostgres === undefined) delete process.env.POSTGRES_URL;
+    else process.env.POSTGRES_URL = originalPostgres;
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
+test("我的帖子：筛选、编辑、删除及权限隔离", async () => {
+  const original = process.cwd();
+  const originalPostgres = process.env.POSTGRES_URL;
+  const temp = await mkdtemp(path.join(os.tmpdir(), "campus-forum-manage-"));
+  await cp(path.join(original, "lib", "db", "migrations"), path.join(temp, "lib", "db", "migrations"), { recursive: true });
+  process.chdir(temp);
+  delete process.env.POSTGRES_URL;
+  // 前一个用例已关闭进程内全局数据库实例，这里重置缓存以便在新目录重新打开
+  (globalThis as Record<string, unknown>).chatbotDb = undefined;
+  const owner = crypto.randomUUID();
+  const other = crypto.randomUUID();
+  try {
+    const minePost = await createForumPost({ userId: owner, author: "owner@example.test", category: "活动", title: "周末羽毛球活动", body: "周六下午体育馆，自带球拍。", place: "体育馆", eventTime: "周六 15:00" });
+    const otherPost = await createForumPost({ userId: other, author: "other@example.test", category: "闲置", title: "出键盘", body: "九成新机械键盘。", place: null, eventTime: null });
+
+    // 只看到自己的帖子
+    const mineList = await listForumPostsByUser(owner);
+    assert.equal(mineList.some((post) => post.id === minePost.id), true);
+    assert.equal(mineList.some((post) => post.id === otherPost.id), false);
+    const mineSearch = await searchForumPosts("键盘", undefined, owner);
+    assert.equal(mineSearch.some((post) => post.id === otherPost.id), false);
+
+    // 编辑：仅作者本人可改
+    assert.equal(await updateForumPost({ id: minePost.id, userId: other, category: "活动", title: "被他人篡改", body: "篡改内容", place: null, eventTime: null }), null);
+    const updated = await updateForumPost({ id: minePost.id, userId: owner, category: "招领", title: "捡到校园卡 13800138000", body: "联系电话 13800138000", place: "图书馆 13800138000", eventTime: null });
+    assert.ok(updated);
+    assert.equal(updated.author, "校园同学");
+    assert.doesNotMatch(`${updated.title}${updated.body}${updated.place}`, /13800138000/);
+    assert.equal(updated.category, "招领");
+
+    // 删除：仅作者本人可删，且清理认领私信
+    const item = await createLostItem({ userId: owner, kind: "found", title: "钥匙", detail: "在食堂捡到一串钥匙。", place: "食堂", color: null, category: "钥匙" });
+    const linked = await createForumPost({ userId: owner, author: "owner@example.test", category: "招领", title: "捡到钥匙", body: "在食堂捡到一串钥匙。", place: "食堂", eventTime: null, lostItemId: item.id });
+    const claimant = crypto.randomUUID();
+    await sendClaimMessage({ postId: linked.id, userId: claimant, body: "是我的钥匙。" });
+    assert.equal(await deleteForumPost(linked.id, other), false);
+    assert.equal(await deleteForumPost(linked.id, owner), true);
+    assert.equal(await getForumPostById(linked.id), null);
+    await assert.rejects(() => getClaimConversations(linked.id, owner));
   } finally {
     const db = await createDatabase();
     await (db as unknown as { $client: { close: () => Promise<void> } }).$client.close();

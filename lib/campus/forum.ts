@@ -9,17 +9,18 @@ export { forumCategories } from "./forum-shared";
 
 const SEED_OWNER = "00000000-0000-4000-8000-000000000001";
 
-let ready: Promise<void> | null = null;
+const readyByDb = new WeakMap<object, Promise<void>>();
 
 function rowsOf(result: unknown): ForumPost[] {
   return (result as { rows?: ForumPost[] }).rows ?? [];
 }
 
 export async function ensureForum() {
+  const db = await createDatabase();
+  let ready = readyByDb.get(db);
   if (!ready) {
     ready = (async () => {
       await ensureLostFoundStore();
-      const db = await createDatabase();
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS "ForumPost" (
           "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -51,9 +52,10 @@ export async function ensureForum() {
           (${SEED_OWNER}, '高数课代表', '闲置', '出一套线性代数教材', '有笔记，九成新。只限校内面交，不邮寄。', '西区宿舍', '本周晚自习后')
       `);
     })().catch((error) => {
-      ready = null;
+      readyByDb.delete(db);
       throw error;
     });
+    readyByDb.set(db, ready);
   }
   return ready;
 }
@@ -92,6 +94,12 @@ export async function getOpenForumPostForLostItem(itemId: string): Promise<Forum
   return posts[0] ?? null;
 }
 
+const LOST_PATTERN = /(失物|寻物|丢|遗失|捡到|拾到)/;
+
+function isLostLike(category: string, body: string, lostItemId?: string | null) {
+  return Boolean(lostItemId) || category === "招领" || (category === "求助" && LOST_PATTERN.test(body));
+}
+
 export async function createForumPost(input: {
   userId: string;
   author: string;
@@ -104,12 +112,12 @@ export async function createForumPost(input: {
 }): Promise<ForumPost> {
   await ensureForum();
   const db = await createDatabase();
-  const isLostPost = Boolean(input.lostItemId) || input.category === "招领" || (input.category === "求助" && /(失物|寻物|丢|遗失|捡到|拾到)/.test(input.body));
-  const title = isLostPost ? redactPublicText(input.title) : input.title;
-  const body = isLostPost ? redactPublicText(input.body) : input.body;
-  const author = isLostPost ? "校园同学" : input.author;
-  const place = isLostPost && input.place ? redactPublicText(input.place) : input.place;
-  const eventTime = isLostPost && input.eventTime ? redactPublicText(input.eventTime) : input.eventTime;
+  const lostPost = isLostLike(input.category, input.body, input.lostItemId);
+  const title = lostPost ? redactPublicText(input.title) : input.title;
+  const body = lostPost ? redactPublicText(input.body) : input.body;
+  const author = lostPost ? "校园同学" : input.author;
+  const place = lostPost && input.place ? redactPublicText(input.place) : input.place;
+  const eventTime = lostPost && input.eventTime ? redactPublicText(input.eventTime) : input.eventTime;
   const created = rowsOf(
     await db.execute(sql`
       INSERT INTO "ForumPost" ("userId", "author", "category", "title", "body", "place", "eventTime", "lostItemId")
@@ -133,6 +141,75 @@ export async function createForumPost(input: {
     throw new Error("帖子没有发布成功");
   }
   return post;
+}
+
+export async function listForumPostsByUser(userId: string): Promise<ForumPost[]> {
+  await ensureForum();
+  const db = await createDatabase();
+  return rowsOf(
+    await db.execute(sql`
+      SELECT p."id", p."userId", p."author", p."category", p."title", p."body", p."place", p."eventTime", p."createdAt", p."lostItemId", l."status" AS "lostItemStatus"
+      FROM "ForumPost" p LEFT JOIN "LostItem" l ON l."id" = p."lostItemId"
+      WHERE p."userId" = ${userId}
+      ORDER BY p."createdAt" DESC
+    `)
+  );
+}
+
+export async function updateForumPost(input: {
+  id: string;
+  userId: string;
+  category: string;
+  title: string;
+  body: string;
+  place: string | null;
+  eventTime: string | null;
+}): Promise<ForumPost | null> {
+  await ensureForum();
+  const existing = await getForumPostById(input.id);
+  if (!existing || existing.userId !== input.userId) {
+    return null;
+  }
+  const db = await createDatabase();
+  const lostPost = isLostLike(input.category, input.body, existing.lostItemId);
+  const title = lostPost ? redactPublicText(input.title) : input.title;
+  const body = lostPost ? redactPublicText(input.body) : input.body;
+  const author = lostPost ? "校园同学" : existing.author;
+  const place = lostPost && input.place ? redactPublicText(input.place) : input.place;
+  const eventTime = lostPost && input.eventTime ? redactPublicText(input.eventTime) : input.eventTime;
+  await db.execute(sql`
+    UPDATE "ForumPost"
+    SET "category" = ${input.category}, "title" = ${title}, "body" = ${body},
+        "place" = ${place}, "eventTime" = ${eventTime}, "author" = ${author}
+    WHERE "id" = ${input.id} AND "userId" = ${input.userId}
+  `);
+  return getForumPostById(input.id);
+}
+
+export async function deleteForumPost(id: string, userId: string): Promise<boolean> {
+  await ensureForum();
+  const existing = await getForumPostById(id);
+  if (!existing || existing.userId !== userId) {
+    return false;
+  }
+  const db = await createDatabase();
+  // 认领私信表由 claims 功能创建，可能尚不存在；先保证存在再清理关联数据
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS "LostClaimThread" (
+    "id" uuid PRIMARY KEY, "postId" uuid NOT NULL, "claimantId" uuid NOT NULL,
+    "createdAt" timestamp NOT NULL DEFAULT now(), UNIQUE ("postId", "claimantId")
+  )`);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS "LostClaimMessage" (
+    "id" uuid PRIMARY KEY, "threadId" uuid NOT NULL, "senderId" uuid NOT NULL,
+    "body" text NOT NULL, "createdAt" timestamp NOT NULL DEFAULT now()
+  )`);
+  await db.execute(sql`
+    DELETE FROM "LostClaimMessage" m
+    USING "LostClaimThread" t
+    WHERE m."threadId" = t."id" AND t."postId" = ${id}
+  `);
+  await db.execute(sql`DELETE FROM "LostClaimThread" WHERE "postId" = ${id}`);
+  await db.execute(sql`DELETE FROM "ForumPost" WHERE "id" = ${id} AND "userId" = ${userId}`);
+  return true;
 }
 
 const QUERY_FILLERS = [
@@ -161,7 +238,7 @@ function searchTerms(query: string) {
   return [...new Set(text.split(/\s+/).map((item) => item.trim()).filter((item) => item.length >= 2))];
 }
 
-export async function searchForumPosts(query: string, category?: string) {
+export async function searchForumPosts(query: string, category?: string, ownerId?: string) {
   const posts = await listForumPosts();
   const text = query.trim();
   const terms = searchTerms(text);
@@ -169,7 +246,7 @@ export async function searchForumPosts(query: string, category?: string) {
     !category &&
     /(活动|讲座|社团|招新|这周|本周)/.test(text) &&
     terms.every((term) => ["活动", "讲座", "社团", "招新"].includes(term));
-  const pool = posts.filter((post) => post.lostItemStatus !== "closed" && (!category || post.category === category));
+  const pool = posts.filter((post) => (ownerId ? true : post.lostItemStatus !== "closed") && (!category || post.category === category) && (!ownerId || post.userId === ownerId));
 
   if (!text) {
     return pool.slice(0, 8);

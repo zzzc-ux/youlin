@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Clock3, MapPin, PenLine, Search, Send } from "lucide-react";
+import { BadgeCheck, Clock3, MapPin, PenLine, Pencil, Search, Send, Trash2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -64,6 +64,8 @@ const CATEGORY_STYLE: Record<string, { badge: string; glow: string; avatar: stri
 const fieldClass =
   "h-10 w-full rounded-xl border border-input bg-background px-3 text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none transition-[border-color,box-shadow] focus:border-violet-400/60 focus:ring-4 focus:ring-violet-500/15";
 
+const MINE_TAB = "我的贴子";
+
 export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
   const router = useRouter();
   const [posts, setPosts] = useState<ForumPost[]>([]);
@@ -73,11 +75,15 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
 
   const loadPosts = useCallback(async (nextCategory: string, nextQuery: string, postId?: string) => {
     const params = new URLSearchParams();
     if (postId) {
       params.set("id", postId);
+    } else if (nextCategory === MINE_TAB) {
+      params.set("mine", "1");
     } else if (nextCategory !== "全部") {
       params.set("category", nextCategory);
     }
@@ -115,31 +121,114 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
     }
   };
 
+  const reloadPosts = useCallback(
+    () => loadPosts(category, initialPostId ? "" : query, initialPostId),
+    [loadPosts, category, query, initialPostId]
+  );
+
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/forum`, {
-        body: JSON.stringify(form),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      });
+      const editing = editingId;
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+      const response = await fetch(
+        editing ? `${basePath}/api/forum?id=${encodeURIComponent(editing)}` : `${basePath}/api/forum`,
+        {
+          body: JSON.stringify(form),
+          headers: { "Content-Type": "application/json" },
+          method: editing ? "PATCH" : "POST",
+        }
+      );
       if (!response.ok) {
         const data = (await response.json()) as { error?: string };
-        toast.error(data.error ?? "发布失败");
+        toast.error(data.error ?? (editing ? "保存失败" : "发布失败"));
         return;
       }
       const data = (await response.json()) as { post: ForumPost };
+      const wasRedacted = data.post.body !== form.body || data.post.title !== form.title || (data.post.place ?? "") !== form.place || (data.post.eventTime ?? "") !== form.eventTime;
+      toast.success(wasRedacted ? (editing ? "已保存，部分个人信息已隐藏" : "已发布，部分个人信息已隐藏") : (editing ? "已保存修改" : "已发到论坛"));
       setForm(emptyForm);
-      toast.success(data.post.body !== form.body || data.post.title !== form.title || (data.post.place ?? "") !== form.place || (data.post.eventTime ?? "") !== form.eventTime ? "已发布，部分个人信息已隐藏" : "已发到论坛");
+      setEditingId(null);
       if (initialPostId) {
-        router.push(`/forum?post=${encodeURIComponent(data.post.id)}`);
+        if (editing) {
+          await reloadPosts();
+        } else {
+          router.push(`/forum?post=${encodeURIComponent(data.post.id)}`);
+        }
       } else {
-        await loadPosts(category, query);
+        await reloadPosts();
       }
     } catch {
-      toast.error("发布失败");
+      toast.error(editingId ? "保存失败" : "发布失败");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const startEdit = (post: ForumPost) => {
+    setEditingId(post.id);
+    setForm({
+      body: post.body,
+      category: post.category,
+      eventTime: post.eventTime ?? "",
+      place: post.place ?? "",
+      title: post.title,
+    });
+    document.getElementById("forum-composer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+  };
+
+  const handleDelete = async (post: ForumPost) => {
+    if (!window.confirm(`确定删除帖子「${post.title}」吗？删除后不可恢复。`)) {
+      return;
+    }
+    setActionBusy(post.id);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/forum?id=${encodeURIComponent(post.id)}`, { method: "DELETE" });
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        toast.error(data.error ?? "删除失败");
+        return;
+      }
+      toast.success("帖子已删除");
+      if (editingId === post.id) {
+        cancelEdit();
+      }
+      if (initialPostId) {
+        router.push("/forum");
+      } else {
+        await reloadPosts();
+      }
+    } catch {
+      toast.error("删除失败");
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const handleResolve = async (post: ForumPost) => {
+    setActionBusy(post.id);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/forum?id=${encodeURIComponent(post.id)}`, {
+        body: JSON.stringify({ action: "resolve" }),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      });
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        toast.error(data.error ?? "操作失败");
+        return;
+      }
+      toast.success("已标记为已解决");
+      await reloadPosts();
+    } catch {
+      toast.error("操作失败");
+    } finally {
+      setActionBusy(null);
     }
   };
 
@@ -207,6 +296,26 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
                     <span className="relative">{item}</span>
                   </button>
                 ))}
+                <button
+                  className={cn(
+                    "relative shrink-0 rounded-xl px-3.5 py-1.5 text-[13px] transition-colors",
+                    category === MINE_TAB ? "text-white" : "text-muted-foreground hover:text-foreground"
+                  )}
+                  onClick={() => setCategory(MINE_TAB)}
+                  type="button"
+                >
+                  {category === MINE_TAB ? (
+                    <motion.span
+                      className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-500/80 via-violet-500/80 to-fuchsia-500/70 shadow-[0_6px_20px_-6px_oklch(0.6_0.22_290/0.8)]"
+                      layoutId="forum-category"
+                      transition={{ damping: 30, stiffness: 380, type: "spring" }}
+                    />
+                  ) : null}
+                  <span className="relative inline-flex items-center gap-1">
+                    <UserRound className="size-3.5" />
+                    {MINE_TAB}
+                  </span>
+                </button>
               </div>
               <div className="flex gap-2 xl:ml-auto">
                 <div className="relative w-full xl:w-52">
@@ -242,7 +351,7 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
               </div>
             ) : posts.length === 0 ? (
               <div className="glass rounded-2xl p-10 text-center text-[14px] text-muted-foreground">
-                {initialPostId ? "帖子不存在，或链接地址有误。" : "这个分类下还没有帖子，来发第一条吧。"}
+                {initialPostId ? "帖子不存在，或链接地址有误。" : category === MINE_TAB ? "你还没有发布过帖子，来发第一条吧。" : "这个分类下还没有帖子，来发第一条吧。"}
               </div>
             ) : (
               <div className="grid gap-3 pb-8">
@@ -277,6 +386,11 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
                                   </span>
                                 ) : null}
                                 <span className="text-foreground/80">{post.author}</span>
+                                {post.mine ? (
+                                  <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-violet-700 ring-1 ring-violet-500/25 dark:text-violet-200">
+                                    我发布的
+                                  </span>
+                                ) : null}
                               </div>
                               <h2 className="mt-2 font-medium text-[16px] text-foreground">{post.title}</h2>
                               <p className="mt-1.5 whitespace-pre-wrap text-[14px] text-muted-foreground leading-7">
@@ -298,6 +412,39 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
                                   ) : null}
                                 </div>
                               ) : null}
+                              {post.mine ? (
+                                <div className="mt-3 flex flex-wrap gap-2 border-t border-border/60 pt-3">
+                                  <button
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1 text-[12px] text-foreground/80 ring-1 ring-border transition-colors hover:text-foreground disabled:opacity-50"
+                                    disabled={actionBusy === post.id}
+                                    onClick={() => startEdit(post)}
+                                    type="button"
+                                  >
+                                    <Pencil className="size-3.5 text-violet-600 dark:text-violet-300" />
+                                    编辑
+                                  </button>
+                                  {post.lostItemId && post.lostItemStatus === "open" ? (
+                                    <button
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-2.5 py-1 text-[12px] text-emerald-800 ring-1 ring-emerald-500/25 transition-colors hover:bg-emerald-500/15 disabled:opacity-50 dark:text-emerald-300"
+                                      disabled={actionBusy === post.id}
+                                      onClick={() => handleResolve(post)}
+                                      type="button"
+                                    >
+                                      <BadgeCheck className="size-3.5" />
+                                      标记已解决
+                                    </button>
+                                  ) : null}
+                                  <button
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-rose-500/10 px-2.5 py-1 text-[12px] text-rose-700 ring-1 ring-rose-500/25 transition-colors hover:bg-rose-500/15 disabled:opacity-50 dark:text-rose-300"
+                                    disabled={actionBusy === post.id}
+                                    onClick={() => handleDelete(post)}
+                                    type="button"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                    删除
+                                  </button>
+                                </div>
+                              ) : null}
                               {initialPostId && post.lostItemId ? <LostClaimPanel itemId={post.lostItemId} postId={post.id} /> : null}
                             </div>
                           </div>
@@ -314,6 +461,7 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
           <FadeIn className="lg:sticky lg:top-8" delay={0.3}>
             <form
               className="glass relative flex flex-col gap-3.5 overflow-hidden rounded-3xl p-5"
+              id="forum-composer"
               onSubmit={(event) => {
                 event.preventDefault();
                 handleSubmit();
@@ -323,7 +471,7 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
                 <span className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/30 to-fuchsia-500/20 text-violet-700 ring-1 ring-border dark:text-violet-200">
                   <PenLine className="size-4" />
                 </span>
-                <h2 className="font-medium text-[15px]">发一条新帖</h2>
+                <h2 className="font-medium text-[15px]">{editingId ? "编辑我的帖子" : "发一条新帖"}</h2>
               </div>
 
               <div className="flex flex-wrap gap-1.5">
@@ -390,8 +538,17 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
                 type="submit"
               >
                 <Send className="size-4" />
-                {submitting ? "发布中…" : "发布帖子"}
+                {submitting ? (editingId ? "保存中…" : "发布中…") : (editingId ? "保存修改" : "发布帖子")}
               </button>
+              {editingId ? (
+                <button
+                  className="h-9 rounded-xl text-[13px] text-muted-foreground ring-1 ring-border transition-colors hover:text-foreground"
+                  onClick={cancelEdit}
+                  type="button"
+                >
+                  取消编辑
+                </button>
+              ) : null}
             </form>
           </FadeIn>
         </div>

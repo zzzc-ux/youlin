@@ -17,7 +17,7 @@ export type LostItem = {
 
 const SEED_OWNER = "00000000-0000-4000-8000-000000000001";
 
-let ready: Promise<void> | null = null;
+const readyByDb = new WeakMap<object, Promise<void>>();
 
 async function rowsOf(result: unknown): Promise<LostItem[]> {
   const rows = (result as { rows?: LostItem[] }).rows ?? [];
@@ -25,9 +25,10 @@ async function rowsOf(result: unknown): Promise<LostItem[]> {
 }
 
 export async function ensureLostFoundStore() {
+  const db = await createDatabase();
+  let ready = readyByDb.get(db);
   if (!ready) {
     ready = (async () => {
-      const db = await createDatabase();
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS "LostItem" (
           "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -56,9 +57,10 @@ export async function ensureLostFoundStore() {
           (${SEED_OWNER}, 'found', '白色水杯', '保温杯，杯身有绿色挂绳，教学楼 A 一层大厅。', '教学楼', '白色', '水杯', 'open')
       `);
     })().catch((error) => {
-      ready = null;
+      readyByDb.delete(db);
       throw error;
     });
+    readyByDb.set(db, ready);
   }
   return ready;
 }
