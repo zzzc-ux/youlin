@@ -131,7 +131,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
-                    className="h-9 rounded-xl text-[13px] text-sidebar-foreground/75 transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-foreground data-[active=true]:bg-white/[0.08] data-[active=true]:text-white"
+                    className="h-9 rounded-xl border border-violet-300/20 bg-gradient-to-r from-indigo-500/20 via-violet-500/15 to-fuchsia-500/10 text-[13px] text-sidebar-foreground transition-all duration-200 hover:border-violet-300/40 hover:from-indigo-500/30 hover:via-violet-500/25 hover:shadow-[0_8px_24px_-10px_oklch(0.6_0.22_290/0.7)] group-data-[collapsible=icon]:border-0 data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                     isActive={pathname.startsWith("/forum")}
                     tooltip="论坛"
                   >
@@ -154,12 +154,12 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                 {user ? (
                   <SidebarMenuItem>
                     <SidebarMenuButton
-                      className="rounded-lg text-sidebar-foreground/40 transition-colors duration-150 hover:bg-destructive/10 hover:text-destructive"
+                      className="h-9 rounded-xl border border-violet-300/20 bg-gradient-to-r from-indigo-500/20 via-violet-500/15 to-fuchsia-500/10 text-[13px] text-sidebar-foreground transition-all duration-200 hover:border-violet-300/40 hover:from-indigo-500/30 hover:via-violet-500/25 hover:shadow-[0_8px_24px_-10px_oklch(0.6_0.22_290/0.7)] group-data-[collapsible=icon]:border-0"
                       onClick={handleShowDeleteAllDialog}
                       tooltip="删除全部对话"
                     >
                       <TrashIcon className="size-4" />
-                      <span className="text-[13px]">删除全部</span>
+                      <span className="font-medium">删除全部</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ) : null}

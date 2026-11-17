@@ -35,6 +35,8 @@ import {
 } from "@/lib/db/queries";
 import type { DBMessage } from "@/lib/db/schema";
 import { ChatbotError } from "@/lib/errors";
+import { getRagConfig } from "@/lib/rag/config";
+import { searchRag } from "@/lib/rag/search";
 import { checkIpRateLimit } from "@/lib/ratelimit";
 import type { CampusTraceData, CampusTraceStep, ChatMessage, WaitingStatusData } from "@/lib/types";
 import { convertToUIMessages, generateUUID, getTextFromMessage } from "@/lib/utils";
@@ -241,9 +243,28 @@ export async function POST(request: Request) {
         writeWaitingStatus("thinking", "正在整理回答…");
         if (outcome.kind === "unknown" && !/^(确认|取消)/.test(userText) && hasModelProvider() && !isTestEnvironment) {
           report({ id: "model", label: "正在生成一般问题的回答", state: "running" });
+          // RAG：先检索本地知识库，把候选内容交给模型判断相关性
+          let ragContext = "";
+          try {
+            const rag = await searchRag(userText, 3);
+            const minScore = getRagConfig().minScore;
+            const goodHits = rag.hits.filter((hit) => hit.score >= minScore);
+            if (goodHits.length > 0) {
+              report({ id: "rag", label: `知识库检索完成，参考 ${goodHits.length} 条内容`, state: "done" });
+              ragContext = goodHits
+                .map((hit) => `【来源：${hit.doc} · 相似度 ${hit.score.toFixed(2)}】\n${hit.content}`)
+                .join("\n\n");
+            } else {
+              report({ id: "rag", label: "知识库未命中相关内容", state: "done" });
+            }
+          } catch {
+            report({ id: "rag", label: "知识库检索不可用，已跳过", state: "error" });
+          }
           const general = streamText({
             model: getLanguageModel(chatModel) as Parameters<typeof streamText>[0]["model"],
-            system: `你的名字是${PRODUCT_NAME}。对闲聊或一般问题自然回答；没有资料时不要声称知道校园实时事实，也不要声称执行了任何操作。`,
+            system: ragContext
+              ? `你的名字是${PRODUCT_NAME}。下面是本地知识库的检索结果，请自行判断它们与用户问题是否相关：相关时优先依据知识库内容回答并在回答末尾标注来源文档名；不相关时完全忽略知识库内容，正常回答一般问题。不要声称执行了任何操作。\n\n===== 知识库检索结果 =====\n${ragContext}\n===== 知识库检索结果结束 =====`
+              : `你的名字是${PRODUCT_NAME}。对闲聊或一般问题自然回答；没有资料时不要声称知道校园实时事实，也不要声称执行了任何操作。`,
             messages: modelMessages,
             onFinish: () => {
               if (trace.steps?.find((step) => step.id === "model")?.state !== "error") {
