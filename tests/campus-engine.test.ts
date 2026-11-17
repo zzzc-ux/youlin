@@ -224,6 +224,17 @@ test("我的帖子：筛选、编辑、删除及权限隔离", async () => {
     assert.equal(await deleteForumPost(linked.id, owner), true);
     assert.equal(await getForumPostById(linked.id), null);
     await assert.rejects(() => getClaimConversations(linked.id, owner));
+
+    // 论坛查询返回帖子入口（无模型环境走关键词兜底，命中种子活动帖）
+    const forumQuery = await runCampusEngine({ text: "这周有什么活动", history: [], userId: owner, chatId: crypto.randomUUID() });
+    assert.equal(forumQuery.kind, "forum");
+    assert.equal(forumQuery.found, true);
+    assert.ok(forumQuery.forumPostId);
+    assert.ok((forumQuery.forumPosts ?? []).length > 0);
+    assert.match(forumQuery.answer, /周五东区操场志愿服务/);
+    const noHit = await runCampusEngine({ text: "有没有完全不存在的火星社团招新帖", history: [], userId: owner, chatId: crypto.randomUUID() });
+    assert.equal(noHit.kind, "forum");
+    assert.equal(noHit.found, false);
   } finally {
     const db = await createDatabase();
     await (db as unknown as { $client: { close: () => Promise<void> } }).$client.close();

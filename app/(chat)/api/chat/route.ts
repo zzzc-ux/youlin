@@ -305,6 +305,10 @@ export async function POST(request: Request) {
           if (outcome.forumPostId) {
             dataStream.write({ type: "data-forum-post-link", data: { postId: outcome.forumPostId, label: outcome.forumPostLabel } });
           }
+          for (const post of outcome.forumPosts ?? []) {
+            if (post.id === outcome.forumPostId) continue;
+            dataStream.write({ type: "data-forum-post-link", data: { postId: post.id, label: `查看帖子：${post.title.slice(0, 24)}` } });
+          }
           dataStream.write({ type: "finish-step" });
           dataStream.write({ finishReason: "stop", type: "finish" });
         }

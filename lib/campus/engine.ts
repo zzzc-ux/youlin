@@ -1,18 +1,21 @@
 import { sql } from "drizzle-orm";
 import { campusTools } from "@/lib/ai/tools/campus";
+import { hasModelProvider } from "@/lib/ai/providers";
 import { createDatabase } from "@/lib/db/client";
 import type { CampusTraceStep } from "@/lib/types";
 import { classifyCampus, type CampusKind } from "./harness";
 import { listOwnOpenItems } from "./lost-found";
 import { redactPublicText } from "./privacy";
-import { getOpenForumPostForLostItem } from "./forum";
+import { getOpenForumPostForLostItem, listForumPosts, searchForumPosts } from "./forum";
+import { matchForumPostsWithLLM } from "./forum-match";
+import type { ForumPost } from "./forum-shared";
 
 type ToolName = keyof ReturnType<typeof campusTools>;
 type WriteTool = "registerLost" | "closeLost" | "createRepair" | "publishForum";
 type Plan = { tool: WriteTool; args: Record<string, unknown>; description: string };
 type HistoryItem = { role: string; text: string };
 type ReportStep = (step: CampusTraceStep) => void;
-export type CampusOutcome = { kind: CampusKind; kindLabel: string; tool: string; sources: string[]; found: boolean; answer: string; evidence: string; pending?: boolean; forumPostId?: string; forumPostLabel?: string };
+export type CampusOutcome = { kind: CampusKind; kindLabel: string; tool: string; sources: string[]; found: boolean; answer: string; evidence: string; pending?: boolean; forumPostId?: string; forumPostLabel?: string; forumPosts?: { id: string; title: string }[] };
 
 // This is the single policy registry used by the chat execution path.
 export const toolPolicy: Record<ToolName, "read" | "write"> = {
@@ -41,6 +44,47 @@ export function routeCampus(text: string, history: HistoryItem[]): { kind: Campu
 
 function result(kind: CampusKind, tool: string, answer: string, found = false, sourceList: string[] = [], evidence = ""): CampusOutcome {
   return { kind, kindLabel: labels[kind], tool, answer, found, sources: sourceList, evidence };
+}
+
+// 论坛查询：优先用 LLM 做语义匹配，模型不可用或失败时回退到关键词匹配；命中后返回帖子入口
+async function handleForumSearch(query: string, report?: ReportStep): Promise<CampusOutcome> {
+  report?.({ id: "execute", label: "正在查询校园论坛", state: "running" });
+  const candidates = (await listForumPosts()).filter((post) => post.lostItemStatus !== "closed");
+  if (candidates.length === 0) {
+    report?.({ id: "execute", label: "论坛暂时没有帖子", state: "waiting" });
+    return result("forum", "searchForum", "论坛目前还没有帖子。", false, [sources.searchForum!]);
+  }
+
+  let matches: ForumPost[] = [];
+  let llmOk = false;
+  if (hasModelProvider()) {
+    report?.({ id: "match", label: "正在用 AI 匹配相关帖子", state: "running" });
+    try {
+      matches = await matchForumPostsWithLLM(query, candidates);
+      llmOk = true;
+      report?.({ id: "match", label: matches.length > 0 ? `AI 匹配到 ${matches.length} 条相关帖子` : "AI 没有找到相关帖子", state: matches.length > 0 ? "done" : "waiting" });
+    } catch {
+      report?.({ id: "match", label: "AI 匹配不可用，改用关键词匹配", state: "waiting" });
+    }
+  }
+  if (matches.length === 0 && !llmOk) {
+    matches = await searchForumPosts(query);
+  }
+  if (matches.length === 0) {
+    report?.({ id: "execute", label: "没有找到相关帖子", state: "waiting" });
+    return result("forum", "searchForum", "没有找到相关帖子，可以换个说法描述要找的内容，或到论坛按分类和关键词查找。", false, [sources.searchForum!]);
+  }
+
+  report?.({ id: "execute", label: `找到 ${matches.length} 条相关帖子`, state: "done" });
+  const lines = matches.map((post) => `【${post.category}】${post.title}，${post.author}${post.eventTime ? `，${post.eventTime}` : ""}${post.place ? `，${post.place}` : ""}\n${post.body}`);
+  const evidence = lines.join("\n\n");
+  const answer = `${evidence}\n\n点击下方链接进入对应帖子。\n来源：${sources.searchForum}`;
+  return {
+    ...result("forum", "searchForum", answer, true, [sources.searchForum!], evidence),
+    forumPostId: matches[0].id,
+    forumPostLabel: "查看匹配的帖子",
+    forumPosts: matches.map((post) => ({ id: post.id, title: post.title })),
+  };
 }
 
 async function executeTool(userId: string, name: ToolName, args: Record<string, unknown>, confirmed = false, author = "同学"): Promise<any> {
@@ -215,6 +259,9 @@ export async function runCampusEngine(input: { text: string; history: HistoryIte
     await savePlan(chatId, userId, plan);
     input.report?.({ id: "draft", label: "已准备操作，等待确认", state: "waiting" });
     return { ...result(kind, plan.tool, `请确认：${plan.description}。\n回复“确认”执行，回复“取消”放弃。`, false), pending: true };
+  }
+  if (kind === "forum") {
+    return handleForumSearch(query, input.report);
   }
   const readTools: Partial<Record<CampusKind, ToolName>> = { notice: "searchNotice", repair: "searchRepair", card: "campusCard", access: "queryAccess", forum: "searchForum", lost: "searchLost", qa: "searchCampus" };
   const tool = readTools[kind];

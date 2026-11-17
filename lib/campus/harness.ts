@@ -26,6 +26,10 @@ export function classifyCampus(text: string): CampusKind {
   if (/(论坛|这周有什么|本周有什么|有什么活动|社团招新|招新|讲座)/.test(text)) {
     return "forum";
   }
+  // 找帖子类诉求：如“帮我找篮球相关的帖子”“有没有关于考研的贴子”
+  if (/(找|搜|查|看|找一找|搜一下).{0,12}(帖子|贴子|帖)|((帖子|贴子).{0,8}(在哪|哪里有|有没有))/.test(text)) {
+    return "forum";
+  }
   if (/(已经找回|找回了|找到了|已归还|已经归还|归还了|已送还|关闭这条|失物关闭)/.test(text)) {
     return "lost";
   }
