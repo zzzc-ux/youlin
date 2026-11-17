@@ -234,12 +234,13 @@ export async function runCampusEngine(input: { text: string; history: HistoryIte
   let sourceList: string[] = sources[tool] ? [sources[tool]!] : [];
   let lines: string[] = [];
   if (tool === "searchNotice") { lines = output.notices.map((x: any) => `${x.title}（${x.publishedAt}）\n${x.body}`); sourceList = output.notices.map((x: any) => x.source); }
-  else if (tool === "searchCampus") { lines = output.articles.map((x: any) => `${x.title}\n${x.body}`); sourceList = output.articles.map((x: any) => x.source); }
+  else if (tool === "searchCampus") { lines = output.articles.map((x: any) => x.body); sourceList = output.articles.map((x: any) => x.source); }
   else if (tool === "searchForum") lines = output.posts.map((x: any) => `【${x.category}】${x.title}，${x.author}${x.eventTime ? `，${x.eventTime}` : ""}${x.place ? `，${x.place}` : ""}\n${x.body}`);
   else if (tool === "searchLost") lines = output.items.map((x: any) => `${x.kind === "found" ? "招领" : "寻物"}：${x.title}，编号 ${x.id.slice(0, 8)}\n${x.detail}`);
   else if (tool === "searchRepair") lines = output.tickets.map((x: any) => `${x.ticketId} ${x.place} ${x.item}，状态 ${x.status}，更新于 ${x.updatedAt}`);
   else if (tool === "queryAccess") { lines = [`${output.place}开放时间：${output.openHours}`]; sourceList = [output.source]; }
   else { lines = [output.action === "balance" ? `余额 ${output.balance}，截至 ${output.asOf}。${output.note}` : output.action === "replace" ? `补办窗口：${output.window}。材料：${output.materials}。${output.note}` : `样本信息：校园卡${output.cardStatus}，自${output.since}。${output.note}这不代表已为你操作真实校园卡。`]; sourceList = [output.source]; }
   const evidence = lines.join("\n\n");
-  return result(kind, tool, `${evidence}\n\n来源：${[...new Set(sourceList)].join("；")}`, true, sourceList, evidence);
+  const uniqueSources = [...new Set(sourceList)];
+  return result(kind, tool, `${evidence}\n\n来源：${uniqueSources.join("；")}`, true, uniqueSources, evidence);
 }

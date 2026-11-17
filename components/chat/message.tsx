@@ -121,6 +121,11 @@ const PurePreviewMessage = ({
     { isStreaming: false, rendered: false, text: "" }
   ) ?? { isStreaming: false, rendered: false, text: "" };
 
+  // 流式过程中同一份处理过程可能被写入多次快照，只渲染最后一份，避免出现多张重复卡片
+  const lastTracePartIndex = message.parts
+    ? message.parts.reduce((last, part, index) => (part.type === "data-campus-trace" ? index : last), -1)
+    : -1;
+
   const parts = message.parts?.map((part, index) => {
     const { type } = part;
     const key = `message-${message.id}-part-${index}`;
@@ -140,6 +145,7 @@ const PurePreviewMessage = ({
     }
 
     if (type === "data-campus-trace") {
+      if (index !== lastTracePartIndex) return null;
       return <CampusTrace key={key} trace={part.data} />;
     }
 

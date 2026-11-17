@@ -30,65 +30,65 @@ function keywordsOf(text: string): string[] {
     .replace(/[\s\p{P}]/gu, " ");
   const grams = new Set<string>();
   for (const part of cleaned.split(/\s+/).filter(Boolean)) {
-    if (part.length <= 4) {
-      if (part.length >= 2) grams.add(part);
-      continue;
-    }
-    for (let n = 2; n <= 4; n += 1) {
+    // 无论长短都拆 2-4 字子串：避免“今天食堂”这类组合整体失配、丢掉“食堂”这个核心词
+    const max = Math.min(4, part.length);
+    for (let n = 2; n <= max; n += 1) {
       for (let i = 0; i + n <= part.length; i += 1) grams.add(part.slice(i, i + n));
     }
   }
   return [...grams];
 }
 
-// 关键词命中分：IDF × 词长加权（越稀有、越长的词贡献越大），避免“几点”“学校”这类短词稀释信号
-function keywordScore(
-  content: string,
-  keywords: { word: string; weight: number }[],
-  totalWeight: number,
-): number {
-  if (totalWeight === 0) return 0;
-  const hit = keywords.reduce(
-    (sum, { word, weight }) => sum + (weight > 0 && content.includes(word) ? weight : 0),
-    0,
-  );
-  return Math.min(hit / totalWeight, 1);
-}
-
-// 从分块中抽取与查询词最匹配的问答片段（分块可能包含多组问答，取命中最强的一段）
+// 从分块中抽取与查询词最匹配的问答片段（保持「问 + 答」成对，避免只返回问题）
 function bestSnippet(
   content: string,
   keywords: { word: string; weight: number }[],
-  maxLength = 400,
-): string {
+  maxLength = 500,
+): { text: string; weight: number } {
+  // 只在 Q 处切分：每段 = 一个问句 + 它的答案（A 行不能被单独切走）
   const segments = content
-    .split(/(?=[QA][:：])/)
+    .split(/(?=Q[:：])/)
     .map((segment) => segment.trim())
-    .filter(Boolean);
-  if (segments.length <= 1) {
-    return content.length > maxLength ? `${content.slice(0, maxLength)}…` : content;
+    .filter((segment) => segment.length > 0);
+  if (segments.length === 0) {
+    return {
+      text: content.length > maxLength ? `${content.slice(0, maxLength)}…` : content,
+      weight: 0,
+    };
   }
+
   let best = "";
+  let bestWeight = 0;
   let bestScore = 0;
   for (const segment of segments) {
-    // 按命中次数累加（上限 3 次），并对冗长段落做轻度归一化：越聚焦的问答对越可信
+    // 问句部分命中权重更高（用户提问最像问句）；每个关键词只计一次，避免长段落靠重复刷分
+    const questionPart = segment.split(/A[:：]/)[0] ?? segment;
     const raw = keywords.reduce((sum, { word, weight }) => {
-      if (weight <= 0) return sum;
-      const occurrences = Math.min(segment.split(word).length - 1, 3);
-      return sum + weight * occurrences;
+      if (weight <= 0 || !segment.includes(word)) return sum;
+      return sum + weight * (questionPart.includes(word) ? 1.5 : 1);
     }, 0);
-    const score = raw / (1 + segment.length / 300);
+    if (raw <= 0) continue;
+    // 长度轻度归一化：同等命中下更聚焦的问答对优先
+    const score = raw / (1 + segment.length / 400);
     if (score > bestScore) {
       bestScore = score;
+      bestWeight = raw;
       best = segment;
     }
   }
+
   if (!best) {
-    // 完全无关键词命中（纯语义召回）：给开头一段作为上下文
-    const head = segments.slice(0, 2).join("");
-    return head.length > maxLength ? `${head.slice(0, maxLength)}…` : head;
+    // 完全无关键词命中（纯语义召回）：给开头一组问答作为上下文
+    const head = segments.slice(0, 2).join(" ");
+    return {
+      text: head.length > maxLength ? `${head.slice(0, maxLength)}…` : head,
+      weight: 0,
+    };
   }
-  return best.length > maxLength ? `${best.slice(0, maxLength)}…` : best;
+  return {
+    text: best.length > maxLength ? `${best.slice(0, maxLength)}…` : best,
+    weight: bestWeight,
+  };
 }
 
 function topK(
@@ -105,20 +105,24 @@ function topK(
   });
   const totalWeight = keywords.reduce((sum, item) => sum + item.weight, 0);
 
-  return chunks
+  const ranked = chunks
     .map((chunk) => {
       const vectorScore = cosineSimilarity(queryVector, chunk.embedding);
-      const kwScore = keywordScore(chunk.content, keywords, totalWeight);
+      const snippet = bestSnippet(chunk.content, keywords);
+      // 用「最佳片段的命中强度」而不是整块命中来排序：一个分块含多组问答，整块命中会串味
+      const snippetScore =
+        totalWeight > 0 ? Math.min((snippet.weight / (totalWeight * 1.5)), 1) : 0;
       return {
         doc: chunk.doc,
         chunkIndex: chunk.chunkIndex,
         content: chunk.content,
-        snippet: bestSnippet(chunk.content, keywords),
-        score: vectorScore * 0.5 + kwScore * 0.5,
+        snippet: snippet.text,
+        score: vectorScore * 0.45 + snippetScore * 0.55,
       };
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, k);
+    .sort((a, b) => b.score - a.score);
+
+  return ranked.slice(0, k);
 }
 
 export interface RagSearchResult {

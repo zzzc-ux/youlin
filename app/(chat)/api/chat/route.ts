@@ -176,6 +176,9 @@ export async function POST(request: Request) {
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         const modelName = chatModel;
+        // 必须最先写入 start：AI SDK 客户端在收到 start 之前会为 data 部件新建一条消息，
+        // 若先写 data-campus-trace，会导致同一条回答在界面上多出一张“影子”处理过程卡片。
+        dataStream.write({ type: "start" });
         const writeWaitingStatus = (
           phase: WaitingStatusData["phase"],
           messageText: string
@@ -241,34 +244,46 @@ export async function POST(request: Request) {
           publishTrace();
         }
         writeWaitingStatus("thinking", "正在整理回答…");
-        if (outcome.kind === "unknown" && !/^(确认|取消)/.test(userText) && hasModelProvider() && !isTestEnvironment) {
-          report({ id: "model", label: "正在生成一般问题的回答", state: "running" });
-          // RAG：先检索本地知识库，把候选内容交给模型判断相关性
+        // 校园问答（qa）也走模型合成：检索结果作为上下文，由模型组织成自然回答
+        const isKnowledgeAnswer = outcome.kind === "qa" && Boolean(outcome.evidence);
+        const canUseModel = (outcome.kind === "unknown" || isKnowledgeAnswer) && !/^(确认|取消)/.test(userText) && hasModelProvider() && !isTestEnvironment;
+        if (canUseModel) {
+          report({ id: "model", label: isKnowledgeAnswer ? "正在基于知识库生成回答" : "正在生成一般问题的回答", state: "running" });
           let ragContext = "";
-          try {
-            const rag = await searchRag(userText, 3);
-            const minScore = getRagConfig().minScore;
-            const goodHits = rag.hits.filter((hit) => hit.score >= minScore);
-            if (goodHits.length > 0) {
-              report({ id: "rag", label: `知识库检索完成，参考 ${goodHits.length} 条内容`, state: "done" });
-              ragContext = goodHits
-                .map((hit) => `【来源：${hit.doc} · 相似度 ${hit.score.toFixed(2)}】\n${hit.content}`)
-                .join("\n\n");
-            } else {
-              report({ id: "rag", label: "知识库未命中相关内容", state: "done" });
+          if (isKnowledgeAnswer) {
+            // qa 已在引擎里完成检索，直接用其证据作为上下文
+            ragContext = outcome.evidence;
+            report({ id: "rag", label: `知识库命中 ${outcome.sources.length} 条内容`, state: "done" });
+          } else {
+            // RAG：先检索本地知识库，把候选内容交给模型判断相关性
+            try {
+              const rag = await searchRag(userText, 3);
+              const minScore = getRagConfig().minScore;
+              const goodHits = rag.hits.filter((hit) => hit.score >= minScore);
+              if (goodHits.length > 0) {
+                report({ id: "rag", label: `知识库检索完成，参考 ${goodHits.length} 条内容`, state: "done" });
+                ragContext = goodHits
+                  .map((hit) => `【来源：${hit.doc} · 相似度 ${hit.score.toFixed(2)}】\n${hit.snippet}`)
+                  .join("\n\n");
+              } else {
+                report({ id: "rag", label: "知识库未命中相关内容", state: "done" });
+              }
+            } catch {
+              report({ id: "rag", label: "知识库检索不可用，已跳过", state: "error" });
             }
-          } catch {
-            report({ id: "rag", label: "知识库检索不可用，已跳过", state: "error" });
           }
+          const systemPrompt = isKnowledgeAnswer
+            ? `你的名字是${PRODUCT_NAME}。请依据下面的知识库检索结果，用自然、简洁的中文回答用户问题：可以适当归纳分点，但不要编造知识库里没有的信息；不要照抄"Q:""A:"的原始问答格式；回答末尾用（来源：文档名）标注来源。不要声称执行了任何操作。\n\n===== 知识库检索结果 =====\n${ragContext}\n===== 知识库检索结果结束 =====`
+            : ragContext
+              ? `你的名字是${PRODUCT_NAME}。下面是本地知识库的检索结果，请自行判断它们与用户问题是否相关：相关时优先依据知识库内容回答并在回答末尾标注来源文档名；不相关时完全忽略知识库内容，正常回答一般问题。不要声称执行了任何操作。\n\n===== 知识库检索结果 =====\n${ragContext}\n===== 知识库检索结果结束 =====`
+              : `你的名字是${PRODUCT_NAME}。对闲聊或一般问题自然回答；没有资料时不要声称知道校园实时事实，也不要声称执行了任何操作。`;
           const general = streamText({
             model: getLanguageModel(chatModel) as Parameters<typeof streamText>[0]["model"],
-            system: ragContext
-              ? `你的名字是${PRODUCT_NAME}。下面是本地知识库的检索结果，请自行判断它们与用户问题是否相关：相关时优先依据知识库内容回答并在回答末尾标注来源文档名；不相关时完全忽略知识库内容，正常回答一般问题。不要声称执行了任何操作。\n\n===== 知识库检索结果 =====\n${ragContext}\n===== 知识库检索结果结束 =====`
-              : `你的名字是${PRODUCT_NAME}。对闲聊或一般问题自然回答；没有资料时不要声称知道校园实时事实，也不要声称执行了任何操作。`,
+            system: systemPrompt,
             messages: modelMessages,
             onFinish: () => {
               if (trace.steps?.find((step) => step.id === "model")?.state !== "error") {
-                report({ id: "model", label: "一般问题的回答已生成", state: "done" });
+                report({ id: "model", label: isKnowledgeAnswer ? "基于知识库的回答已生成" : "一般问题的回答已生成", state: "done" });
               }
             },
             onError: () => report({ id: "model", label: "回答生成失败", state: "error" }),
