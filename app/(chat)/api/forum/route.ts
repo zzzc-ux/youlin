@@ -11,6 +11,7 @@ import {
   searchForumPosts,
   updateForumPost,
 } from "@/lib/campus/forum";
+import { countForumComments } from "@/lib/campus/forum-comments";
 import { closeOwnItem } from "@/lib/campus/lost-found";
 
 const postSchema = z.object({
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "帖子地址无效" }, { status: 400 });
     }
     const post = await getForumPostById(postId);
-    return NextResponse.json({ posts: post ? [publicPost(post, session.user.id)] : [] });
+    return NextResponse.json({ posts: post ? await withCommentCounts([publicPost(post, session.user.id)]) : [] });
   }
   const query = searchParams.get("q") ?? "";
   const category = searchParams.get("category") ?? "";
@@ -49,12 +50,17 @@ export async function GET(request: Request) {
       ? await searchForumPosts(query, category || undefined)
       : await listForumPosts();
 
-  return NextResponse.json({ posts: posts.map((post) => publicPost(post, session.user.id)) });
+  return NextResponse.json({ posts: await withCommentCounts(posts.map((post) => publicPost(post, session.user.id))) });
 }
 
 function publicPost<T extends { userId: string }>(post: T, currentUserId: string) {
   const { userId, ...rest } = post;
   return { ...rest, mine: userId === currentUserId };
+}
+
+async function withCommentCounts<T extends { id: string }>(posts: T[]) {
+  const counts = await countForumComments(posts.map((post) => post.id));
+  return posts.map((post) => ({ ...post, commentCount: counts.get(post.id) ?? 0 }));
 }
 
 export async function POST(request: Request) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { BadgeCheck, Clock3, MapPin, PenLine, Pencil, Search, Send, Trash2, UserRound } from "lucide-react";
+import { BadgeCheck, Clock3, CornerDownRight, MapPin, MessageCircle, PenLine, Pencil, Search, Send, Trash2, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -16,7 +16,7 @@ import {
 } from "@/components/effects/text-effects";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { LostClaimPanel } from "@/components/chat/lost-claim-panel";
-import { forumCategories, type ForumPost } from "@/lib/campus/forum-shared";
+import { forumCategories, type ForumComment, type ForumPost } from "@/lib/campus/forum-shared";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +66,13 @@ const fieldClass =
 
 const MINE_TAB = "我的贴子";
 
+const formatCommentTime = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : date.toLocaleString("zh-CN", { day: "numeric", hour: "2-digit", minute: "2-digit", month: "numeric" });
+};
+
 export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
   const router = useRouter();
   const [posts, setPosts] = useState<ForumPost[]>([]);
@@ -77,6 +84,12 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
   const [loadError, setLoadError] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [comments, setComments] = useState<ForumComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentBody, setCommentBody] = useState("");
+  const [replyTo, setReplyTo] = useState<ForumComment | null>(null);
+  const [commentBusy, setCommentBusy] = useState(false);
 
   const loadPosts = useCallback(async (nextCategory: string, nextQuery: string, postId?: string) => {
     const params = new URLSearchParams();
@@ -234,6 +247,60 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
 
   const update = (key: keyof typeof emptyForm) => (value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
+
+  const toggleComments = async (post: ForumPost) => {
+    if (expandedId === post.id) {
+      setExpandedId(null);
+      setReplyTo(null);
+      return;
+    }
+    setExpandedId(post.id);
+    setReplyTo(null);
+    setCommentBody("");
+    setComments([]);
+    setCommentsLoading(true);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/forum/comments?postId=${encodeURIComponent(post.id)}`);
+      if (!response.ok) {
+        throw new Error("加载失败");
+      }
+      const data = (await response.json()) as { comments: ForumComment[] };
+      setComments(data.comments);
+    } catch {
+      toast.error("评论加载失败");
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const submitComment = async (post: ForumPost) => {
+    const body = commentBody.trim();
+    if (!body) {
+      return;
+    }
+    setCommentBusy(true);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/forum/comments`, {
+        body: JSON.stringify({ body, parentId: replyTo?.id, postId: post.id }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        toast.error(data.error ?? "评论失败");
+        return;
+      }
+      const data = (await response.json()) as { comment: ForumComment };
+      setComments((current) => [...current, data.comment]);
+      setPosts((current) => current.map((item) => (item.id === post.id ? { ...item, commentCount: (item.commentCount ?? 0) + 1 } : item)));
+      setCommentBody("");
+      setReplyTo(null);
+    } catch {
+      toast.error("评论失败");
+    } finally {
+      setCommentBusy(false);
+    }
+  };
 
   return (
     <div className="relative h-dvh overflow-y-auto">
@@ -412,8 +479,16 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
                                   ) : null}
                                 </div>
                               ) : null}
-                              {post.mine ? (
-                                <div className="mt-3 flex flex-wrap gap-2 border-t border-border/60 pt-3">
+                              <div className="mt-3 flex flex-wrap gap-2 border-t border-border/60 pt-3">
+                                <button
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1 text-[12px] text-foreground/80 ring-1 ring-border transition-colors hover:text-foreground disabled:opacity-50"
+                                  onClick={() => toggleComments(post)}
+                                  type="button"
+                                >
+                                  <MessageCircle className="size-3.5 text-cyan-600 dark:text-cyan-300" />
+                                  回复{(post.commentCount ?? 0) > 0 ? ` ${post.commentCount}` : ""}
+                                </button>
+                                {post.mine ? (
                                   <button
                                     className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1 text-[12px] text-foreground/80 ring-1 ring-border transition-colors hover:text-foreground disabled:opacity-50"
                                     disabled={actionBusy === post.id}
@@ -423,17 +498,19 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
                                     <Pencil className="size-3.5 text-violet-600 dark:text-violet-300" />
                                     编辑
                                   </button>
-                                  {post.lostItemId && post.lostItemStatus === "open" ? (
-                                    <button
-                                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-2.5 py-1 text-[12px] text-emerald-800 ring-1 ring-emerald-500/25 transition-colors hover:bg-emerald-500/15 disabled:opacity-50 dark:text-emerald-300"
-                                      disabled={actionBusy === post.id}
-                                      onClick={() => handleResolve(post)}
-                                      type="button"
-                                    >
-                                      <BadgeCheck className="size-3.5" />
-                                      标记已解决
-                                    </button>
-                                  ) : null}
+                                ) : null}
+                                {post.mine && post.lostItemId && post.lostItemStatus === "open" ? (
+                                  <button
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-2.5 py-1 text-[12px] text-emerald-800 ring-1 ring-emerald-500/25 transition-colors hover:bg-emerald-500/15 disabled:opacity-50 dark:text-emerald-300"
+                                    disabled={actionBusy === post.id}
+                                    onClick={() => handleResolve(post)}
+                                    type="button"
+                                  >
+                                    <BadgeCheck className="size-3.5" />
+                                    标记已解决
+                                  </button>
+                                ) : null}
+                                {post.mine ? (
                                   <button
                                     className="inline-flex items-center gap-1.5 rounded-lg bg-rose-500/10 px-2.5 py-1 text-[12px] text-rose-700 ring-1 ring-rose-500/25 transition-colors hover:bg-rose-500/15 disabled:opacity-50 dark:text-rose-300"
                                     disabled={actionBusy === post.id}
@@ -443,6 +520,77 @@ export function ForumBoard({ initialPostId }: { initialPostId?: string }) {
                                     <Trash2 className="size-3.5" />
                                     删除
                                   </button>
+                                ) : null}
+                              </div>
+                              {expandedId === post.id ? (
+                                <div className="mt-3 rounded-2xl bg-muted/50 p-3.5 ring-1 ring-border">
+                                  {commentsLoading ? (
+                                    <p className="text-[13px] text-muted-foreground">评论加载中…</p>
+                                  ) : comments.length === 0 ? (
+                                    <p className="text-[13px] text-muted-foreground">还没有评论，来说两句吧。</p>
+                                  ) : (
+                                    <div className="flex flex-col gap-2.5">
+                                      {comments.map((comment) => {
+                                        const parent = comment.parentId ? comments.find((item) => item.id === comment.parentId) : null;
+                                        return (
+                                          <div
+                                            className={cn("flex flex-col gap-1", comment.parentId && "ml-4 border-l-2 border-border pl-2.5")}
+                                            key={comment.id}
+                                          >
+                                            <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+                                              <span className="text-foreground/80">{comment.mine ? "我" : comment.author}</span>
+                                              {parent ? <span className="text-muted-foreground/70">回复 {parent.mine ? "我" : parent.author}</span> : null}
+                                              <span>{formatCommentTime(comment.createdAt)}</span>
+                                              <button
+                                                className="text-violet-700 transition-colors hover:underline dark:text-violet-300"
+                                                onClick={() => setReplyTo(comment)}
+                                                type="button"
+                                              >
+                                                回复
+                                              </button>
+                                            </div>
+                                            <p className="whitespace-pre-wrap text-[13px] text-foreground/90 leading-6">{comment.body}</p>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                  {replyTo ? (
+                                    <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                                      <CornerDownRight className="size-3.5" />
+                                      <span className="min-w-0 truncate">回复 {replyTo.mine ? "我" : replyTo.author}：{replyTo.body.slice(0, 20)}</span>
+                                      <button
+                                        aria-label="取消回复"
+                                        className="shrink-0 transition-colors hover:text-foreground"
+                                        onClick={() => setReplyTo(null)}
+                                        type="button"
+                                      >
+                                        <X className="size-3.5" />
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                  <form
+                                    className="mt-2.5 flex gap-2"
+                                    onSubmit={(event) => {
+                                      event.preventDefault();
+                                      submitComment(post);
+                                    }}
+                                  >
+                                    <input
+                                      className={cn(fieldClass, "h-9 text-[13px]")}
+                                      maxLength={500}
+                                      onChange={(event) => setCommentBody(event.target.value)}
+                                      placeholder={replyTo ? `回复 ${replyTo.mine ? "我" : replyTo.author}…` : "写下你的评论…"}
+                                      value={commentBody}
+                                    />
+                                    <button
+                                      className="btn-cosmic h-9 shrink-0 rounded-xl px-4 text-[13px] disabled:opacity-60"
+                                      disabled={commentBusy || !commentBody.trim()}
+                                      type="submit"
+                                    >
+                                      发送
+                                    </button>
+                                  </form>
                                 </div>
                               ) : null}
                               {initialPostId && post.lostItemId ? <LostClaimPanel itemId={post.lostItemId} postId={post.id} /> : null}

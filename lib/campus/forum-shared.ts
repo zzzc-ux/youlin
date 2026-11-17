@@ -16,4 +16,19 @@ export type ForumPost = {
   lostItemStatus?: "open" | "closed" | null;
   /** 服务端计算：当前请求用户是否为帖子作者 */
   mine?: boolean;
+  /** 服务端计算：该帖评论数 */
+  commentCount?: number;
+};
+
+export type ForumComment = {
+  id: string;
+  postId: string;
+  userId: string;
+  author: string;
+  body: string;
+  /** 回复目标评论 id；只保留两级，回复的回复会挂到根评论下 */
+  parentId: string | null;
+  createdAt: string;
+  /** 服务端计算：当前请求用户是否为评论作者 */
+  mine?: boolean;
 };

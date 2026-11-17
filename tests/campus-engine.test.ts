@@ -8,6 +8,7 @@ import { createLostItem, listOpenItems, searchLostByText } from "../lib/campus/l
 import { createDatabase } from "../lib/db/client";
 import { searchRepairs } from "../lib/campus/repairs";
 import { createForumPost, deleteForumPost, getForumPostById, listForumPosts, listForumPostsByUser, searchForumPosts, updateForumPost } from "../lib/campus/forum";
+import { countForumComments, createForumComment, listForumComments } from "../lib/campus/forum-comments";
 import { sql } from "drizzle-orm";
 import type { CampusTraceStep } from "../lib/types";
 import { getClaimConversations, sendClaimMessage } from "../lib/campus/claims";
@@ -250,6 +251,54 @@ test("我的帖子：筛选、编辑、删除及权限隔离", async () => {
   } finally {
     const db = await createDatabase();
     await (db as unknown as { $client: { close: () => Promise<void> } }).$client.close();
+    process.chdir(original);
+    if (originalPostgres === undefined) delete process.env.POSTGRES_URL;
+    else process.env.POSTGRES_URL = originalPostgres;
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
+test("论坛评论：评论、两级回复、计数与级联删除", async () => {
+  const original = process.cwd();
+  const originalPostgres = process.env.POSTGRES_URL;
+  const temp = await mkdtemp(path.join(os.tmpdir(), "campus-forum-comments-"));
+  await cp(path.join(original, "lib", "db", "migrations"), path.join(temp, "lib", "db", "migrations"), { recursive: true });
+  process.chdir(temp);
+  delete process.env.POSTGRES_URL;
+  (globalThis as Record<string, unknown>).chatbotDb = undefined;
+  const owner = crypto.randomUUID();
+  const visitor = crypto.randomUUID();
+  try {
+    const post = await createForumPost({ userId: owner, author: "owner@example.test", category: "活动", title: "周末羽毛球活动", body: "周六下午体育馆，自带球拍。", place: "体育馆", eventTime: "周六 15:00" });
+
+    // 评论与不存在的帖子/跨帖 parent 校验
+    const first = await createForumComment({ postId: post.id, userId: visitor, author: "visitor@example.test", body: "还带人吗？" });
+    assert.equal(first.parentId, null);
+    await assert.rejects(() => createForumComment({ postId: crypto.randomUUID(), userId: visitor, author: "v", body: "评论" }), /帖子不存在/);
+    const otherPost = await createForumPost({ userId: owner, author: "owner@example.test", category: "闲置", title: "出键盘", body: "九成新。", place: null, eventTime: null });
+    await assert.rejects(() => createForumComment({ postId: otherPost.id, userId: visitor, author: "v", body: "串帖回复", parentId: first.id }), /要回复的评论不存在/);
+
+    // 两级回复：回复一条回复时挂到根评论下
+    const reply = await createForumComment({ postId: post.id, userId: owner, author: "owner@example.test", body: "还带，直接来。", parentId: first.id });
+    assert.equal(reply.parentId, first.id);
+    const nested = await createForumComment({ postId: post.id, userId: visitor, author: "visitor@example.test", body: "好的，谢谢！", parentId: reply.id });
+    assert.equal(nested.parentId, first.id);
+
+    // 列表按时间升序，计数正确
+    const comments = await listForumComments(post.id);
+    assert.equal(comments.length, 3);
+    assert.deepEqual(comments.map((comment) => comment.id), [first.id, reply.id, nested.id]);
+    const counts = await countForumComments([post.id, otherPost.id]);
+    assert.equal(counts.get(post.id), 3);
+    assert.equal(counts.get(otherPost.id), undefined);
+
+    // 删除帖子级联清理评论
+    assert.equal(await deleteForumPost(post.id, owner), true);
+    assert.equal((await listForumComments(post.id)).length, 0);
+  } finally {
+    const db = await createDatabase();
+    await (db as unknown as { $client: { close: () => Promise<void> } }).$client.close();
+    (globalThis as Record<string, unknown>).chatbotDb = undefined;
     process.chdir(original);
     if (originalPostgres === undefined) delete process.env.POSTGRES_URL;
     else process.env.POSTGRES_URL = originalPostgres;

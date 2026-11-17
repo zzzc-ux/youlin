@@ -208,6 +208,13 @@ export async function deleteForumPost(id: string, userId: string): Promise<boole
     WHERE m."threadId" = t."id" AND t."postId" = ${id}
   `);
   await db.execute(sql`DELETE FROM "LostClaimThread" WHERE "postId" = ${id}`);
+  // 评论表由评论功能创建，可能尚不存在；同样先保证存在再清理
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS "ForumComment" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+    "postId" uuid NOT NULL, "userId" uuid NOT NULL, "author" varchar(64) NOT NULL,
+    "body" text NOT NULL, "parentId" uuid, "createdAt" timestamp NOT NULL DEFAULT now()
+  )`);
+  await db.execute(sql`DELETE FROM "ForumComment" WHERE "postId" = ${id}`);
   await db.execute(sql`DELETE FROM "ForumPost" WHERE "id" = ${id} AND "userId" = ${userId}`);
   return true;
 }
