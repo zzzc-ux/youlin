@@ -113,6 +113,18 @@ test("登记、取消、并发确认及精确关闭只作用于目标记录", as
     assert.match(direct.answer, /发布者：校园同学/);
     await runCampusEngine({ ...postInput, text: "取消" });
 
+    // 确认/取消指令允许首尾夹带引号和标点（实测：用户输入 确认发布” 曾导致指令失效、计划被顶替）
+    const quoteInput = { history: [], userId, chatId: crypto.randomUUID(), author: "student@example.test" };
+    const quotePreview = await runCampusEngine({ ...quoteInput, text: "帮我在论坛发个闲置帖：转让一本九成新的高数教材" });
+    assert.equal(quotePreview.pending, true);
+    const quoted = await runCampusEngine({ ...quoteInput, text: "确认发布”" });
+    assert.equal(quoted.found, true);
+    assert.match(quoted.answer, /已发布到校园论坛/);
+    const quoteCancelPreview = await runCampusEngine({ ...quoteInput, text: "帮我在论坛发个闲置帖：转让一副羽毛球拍" });
+    assert.equal(quoteCancelPreview.pending, true);
+    const quotedCancel = await runCampusEngine({ ...quoteInput, text: "“取消”" });
+    assert.match(quotedCancel.answer, /已取消/);
+
     // 拾物者登记、发布、双方站内核对，最后由登记人确认归还。
     const foundPreview = await run("我在图书馆捡到一张校园卡，手机号13800138000");
     assert.equal(foundPreview.pending, true);

@@ -7,6 +7,7 @@ import { classifyCampus, type CampusKind } from "./harness";
 import { listOwnOpenItems } from "./lost-found";
 import { redactPublicText } from "./privacy";
 import { getOpenForumPostForLostItem, listForumPosts, searchForumPosts } from "./forum";
+import { draftForumPostWithLLM } from "./forum-draft";
 import { matchForumPostsWithLLM } from "./forum-match";
 import type { ForumPost } from "./forum-shared";
 
@@ -154,6 +155,7 @@ async function resolvePlan(chatId: string, userId: string, approve: boolean, aut
 }
 
 function asksToPublish(text: string, history: HistoryItem[]): boolean {
+  if (/^(?:寻物启事|招领启事|失物招领)\s*[:：]/.test(text)) return true;
   if (/(?:发布|发).{0,8}(?:这条|该条|我的).{0,8}(?:失物|寻物|招领)/.test(text)) return true;
   if (/(?:发布|发表|发|贴).{0,16}(?:论坛|帖子|贴子|帖|寻物|招领)|(?:论坛|帖子|贴子).{0,12}(?:发布|发表|发|贴)/.test(text)) return true;
   if (/(?:帮我|替我|请|麻烦)?\s*(?:发布|发出去|发一下|发一条)[。！!\s]*$/.test(text)) {
@@ -164,10 +166,11 @@ function asksToPublish(text: string, history: HistoryItem[]): boolean {
 
 function forumBody(text: string): string {
   return text
+    .replace(/^(?:寻物启事|招领启事|失物招领)\s*[:：]\s*/g, "")
     .replace(/(?:请|麻烦|我想|我要|我需要)?(?:帮我|替我|给我)?(?:发布|发表|发)(?:到|在|去)(?:校园)?论坛/g, "")
     .replace(/(?:请|麻烦|我想|我要|我需要)?(?:帮我|替我|给我)?(?:在|到|往)?(?:校园)?论坛(?:上|里|中)?(?:发一个帖子|发一条帖子|发个帖子|发帖子|发个帖|发帖|发表|发布|发一条|发)?/g, "")
-    .replace(/(?:请|麻烦|我想|我要|我需要)?(?:帮我|替我|给我)?(?:发布|发表|发)(?:一个|一条|个)?(?:帖子|贴子|帖)/g, "")
-    .replace(/(?:请|麻烦|我想|我要|我需要)?(?:帮我|替我|给我)?(?:发布|发)(?:一个|一条|个|这条|该条|我的)?(?:失物|寻物|招领)(?:信息|帖子|帖)?/g, "")
+    .replace(/(?:请|麻烦|我想|我要|我需要)?(?:帮我|替我|给我)?(?:发布|发表|发)(?:一个|一条|一则|个)?(?:帖子|贴子|帖)/g, "")
+    .replace(/(?:请|麻烦|我想|我要|我需要)?(?:帮我|替我|给我)?(?:发布|发)(?:一个|一条|一则|个|这条|该条|我的)?(?:失物|寻物|招领)(?:启事|信息|帖子|帖)?/g, "")
     .replace(/(?:请|麻烦)?(?:帮我|替我)?(?:发布|发出去|发一下|发一条)[。！!\s]*$/g, "")
     .replace(/^[\s，。,:：、！!]+|[\s，。,:：、！!]+$/g, "")
     .trim();
@@ -184,8 +187,10 @@ function forumCategory(text: string): "活动" | "讲座" | "社团" | "招领" 
 
 export async function runCampusEngine(input: { text: string; history: HistoryItem[]; userId: string; chatId: string; author?: string; report?: ReportStep }): Promise<CampusOutcome> {
   const { text, history, userId, chatId } = input;
-  if (/^(确认|确认执行|确认登记|确认关闭|确认发布|是的确认)[。！!\s]*$/.test(text)) return resolvePlan(chatId, userId, true, input.author ?? "同学", input.report);
-  if (/^(取消|取消操作|取消发布|不登记|不关闭|不发布)[。！!\s]*$/.test(text)) return resolvePlan(chatId, userId, false, input.author ?? "同学", input.report);
+  // 确认/取消指令允许首尾夹带引号和标点（如 确认发布”），避免用户复制预览文字时指令失效
+  const command = text.trim().replace(/^[\s"'“”‘’「」]+|[\s"'“”‘’「」。！!，,]+$/g, "");
+  if (/^(确认|确认执行|确认登记|确认关闭|确认发布|是的确认)$/.test(command)) return resolvePlan(chatId, userId, true, input.author ?? "同学", input.report);
+  if (/^(取消|取消操作|取消发布|不登记|不关闭|不发布)$/.test(command)) return resolvePlan(chatId, userId, false, input.author ?? "同学", input.report);
   input.report?.({ id: "classify", label: "正在识别请求", state: "running" });
   const db = await ensureTables();
   await db.execute(sql`UPDATE "CampusPending" SET "status" = 'superseded' WHERE "chatId" = ${chatId} AND "userId" = ${userId} AND "status" = 'pending'`);
@@ -218,16 +223,42 @@ export async function runCampusEngine(input: { text: string; history: HistoryIte
       return result("forum", "publishForum", "请告诉我要发布的帖子内容，例如物品、地点和联系方式。不要提供不希望公开的个人信息。");
     }
     if (body.length > 2000) return result("forum", "publishForum", "帖子内容不能超过 2000 字，请缩短后重新发送。");
-    const category = forumCategory(body);
-    const isLostPost = Boolean(linked) || category === "招领" || (category === "求助" && /(失物|寻物|丢|遗失|捡到|拾到)/.test(body));
-    const originalBody = body;
-    if (isLostPost) body = redactPublicText(body);
-    const title = body.split(/[。！？\n]/)[0].slice(0, 80).trim();
+    // 优先用 LLM 把一句话整理成结构化帖子（标题/正文/分类/地点/时间），模型不可用或失败时回退到规则提取
+    let draft: Awaited<ReturnType<typeof draftForumPostWithLLM>> = null;
+    if (hasModelProvider()) {
+      input.report?.({ id: "draft", label: "正在用 AI 整理帖子内容", state: "running" });
+      try {
+        draft = await draftForumPostWithLLM(body);
+        input.report?.({ id: "draft", label: draft ? "AI 已整理出帖子结构" : "AI 整理失败，按原文提取", state: draft ? "done" : "waiting" });
+      } catch {
+        input.report?.({ id: "draft", label: "AI 整理不可用，按原文提取", state: "waiting" });
+      }
+    }
+    const category = draft?.category ?? forumCategory(body);
+    const isLostPost = Boolean(linked) || draft?.lostKind != null || category === "招领" || (category === "求助" && /(失物|寻物|丢|遗失|捡到|拾到)/.test(body));
+    if (draft) body = draft.body;
+    let title = draft?.title ?? "";
+    // 招领/寻物帖沿用隐私保护：正文、标题、地点、时间统一脱敏后再预览与发布
+    let redacted = false;
+    let place = draft?.place ?? undefined;
+    let eventTime = draft?.eventTime ?? undefined;
+    if (isLostPost) {
+      const cleanBody = redactPublicText(body);
+      const cleanTitle = redactPublicText(title);
+      const cleanPlace = place ? redactPublicText(place) : place;
+      const cleanEventTime = eventTime ? redactPublicText(eventTime) : eventTime;
+      redacted = cleanBody !== body || cleanTitle !== title || cleanPlace !== place || cleanEventTime !== eventTime;
+      body = cleanBody;
+      title = cleanTitle;
+      place = cleanPlace;
+      eventTime = cleanEventTime;
+    }
+    if (title.length < 2) title = body.split(/[。！？\n]/)[0].slice(0, 80).trim();
     if (title.length < 2) return result("forum", "publishForum", "请补充至少两个字的帖子标题或内容。");
-    const plan: Plan = { tool: "publishForum", args: { title, body, category, ...(linked ? { lostItemId: linked.id } : {}) }, description: "发布校园论坛帖子" };
+    const plan: Plan = { tool: "publishForum", args: { title, body, category, ...(place ? { place } : {}), ...(eventTime ? { eventTime } : {}), ...(linked ? { lostItemId: linked.id } : {}) }, description: "发布校园论坛帖子" };
     await savePlan(chatId, userId, plan);
     input.report?.({ id: "draft", label: "已生成帖子预览，等待确认", state: "waiting" });
-    return { ...result("forum", plan.tool, `请确认发布到校园论坛：\n发布者：${isLostPost ? "校园同学" : input.author ?? "同学"}\n分类：${category}\n标题：${title}\n内容：${body}\n${linked ? `关联记录：${linked.id.slice(0, 8)}\n` : isLostPost ? "该帖未关联失物记录，不能使用站内联系和同步关闭；如需这些功能，请取消并先登记失物。\n" : ""}${body !== originalBody ? "已隐藏检测到的部分个人信息，请继续检查。\n" : ""}\n以上内容对论坛用户可见。请检查并删除不愿公开的信息；自动识别不一定完整。回复“确认发布”执行，回复“取消”放弃。`), pending: true };
+    return { ...result("forum", plan.tool, `请确认发布到校园论坛：\n发布者：${isLostPost ? "校园同学" : input.author ?? "同学"}\n分类：${category}\n标题：${title}\n${place ? `地点：${place}\n` : ""}${eventTime ? `时间：${eventTime}\n` : ""}内容：${body}\n${linked ? `关联记录：${linked.id.slice(0, 8)}\n` : isLostPost ? "该帖未关联失物记录，不能使用站内联系和同步关闭；如需这些功能，请取消并先登记失物。\n" : ""}${redacted ? "已隐藏检测到的部分个人信息，请继续检查。\n" : ""}\n以上内容对论坛用户可见。请检查并删除不愿公开的信息；自动识别不一定完整。回复“确认发布”执行，回复“取消”放弃。`), pending: true };
   }
   const route = routeCampus(text, history);
   const kind = route.kind;
