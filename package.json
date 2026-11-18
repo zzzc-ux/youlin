@@ -17,7 +17,9 @@
     "db:check": "drizzle-kit check",
     "db:up": "drizzle-kit up",
     "test": "export PLAYWRIGHT=True && pnpm exec playwright test",
-    "test:campus": "node --import tsx --test tests/campus-engine.test.ts tests/campus-harness.test.ts"
+    "test:campus": "node --import tsx --test tests/campus-engine.test.ts tests/campus-harness.test.ts",
+    "bulletins:sync": "tsx --conditions=react-server scripts/bulletins-sync.ts",
+    "bulletins:review": "tsx --conditions=react-server scripts/bulletins-review.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.118",

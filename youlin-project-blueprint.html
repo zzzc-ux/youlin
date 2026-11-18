@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>有邻 · 项目框架图与技术路线图</title>
+<style>
+  :root{
+    --bg:#FBFAFD;
+    --paper:#FFFFFF;
+    --ink:#16151A;
+    --ink-2:#3D3A46;
+    --muted:#6E6A79;
+    --faint:#9A96A6;
+    --line:#E6E3EE;
+    --line-2:#D6D1E2;
+    --violet:#6B3FD4;
+    --violet-2:#8B63E8;
+    --violet-tint:#F3EEFD;
+    --violet-tint-2:#E7DEFA;
+    --teal:#1C7A66;
+    --teal-tint:#E9F5F1;
+    --amber:#A96A10;
+    --amber-tint:#FBF2E2;
+    --rose:#B0475C;
+    --rose-tint:#FCEDF0;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono","Cascadia Mono",Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    font-size:14px;line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1200px;margin:0 auto;padding:52px 40px 80px;}
+
+  /* ---------- header ---------- */
+  header.top{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:44px;}
+  .eyebrow{
+    display:flex;align-items:center;gap:10px;font-family:var(--mono);
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--violet);
+    margin-bottom:14px;
+  }
+  .eyebrow::before{content:"";width:22px;height:1px;background:var(--violet);}
+  h1{
+    font-size:34px;line-height:1.25;letter-spacing:-.02em;margin:0 0 10px;font-weight:650;
+  }
+  h1 span{color:var(--violet);}
+  .lede{font-size:14.5px;color:var(--muted);max-width:760px;margin:0 0 22px;}
+  .stats{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--line);border-radius:10px;background:var(--paper);overflow:hidden;}
+  .stat{padding:11px 20px;border-right:1px solid var(--line);flex:1 1 auto;min-width:118px;}
+  .stat:last-child{border-right:0;}
+  .stat b{display:block;font-family:var(--mono);font-size:17px;font-weight:600;letter-spacing:-.01em;}
+  .stat span{font-size:11px;color:var(--faint);letter-spacing:.04em;}
+
+  /* ---------- section ---------- */
+  section{margin-top:56px;}
+  .sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:8px;}
+  .sec-no{
+    font-family:var(--mono);font-size:11px;color:var(--violet);letter-spacing:.12em;
+    padding:2px 8px;border:1px solid var(--violet-tint-2);border-radius:4px;background:var(--violet-tint);
+  }
+  h2{font-size:21px;margin:0;letter-spacing:-.01em;font-weight:650;}
+  .sec-sub{color:var(--muted);font-size:13px;margin:0 0 26px;padding-left:0;max-width:76ch;}
+  h3{font-size:13px;margin:34px 0 14px;letter-spacing:.02em;font-weight:600;display:flex;align-items:center;gap:9px;}
+  h3::before{content:"";width:3px;height:13px;background:var(--violet);border-radius:2px;}
+
+  /* ---------- layer stack ---------- */
+  .stack{position:relative;display:flex;flex-direction:column;gap:8px;}
+  .layer{
+    display:grid;grid-template-columns:76px 1fr;gap:0;
+    background:var(--paper);border:1px solid var(--line);border-radius:10px;
+    overflow:hidden;position:relative;
+  }
+  .layer:hover{border-color:var(--line-2);}
+  .rail{
+    border-right:1px solid var(--line);
+    background:linear-gradient(180deg,#FCFBFE,#F7F5FC);
+    padding:13px 0 13px 12px;display:flex;flex-direction:column;gap:3px;
+  }
+  .rail .no{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--violet);line-height:1.1;}
+  .rail .tp{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;color:var(--faint);text-transform:uppercase;}
+  .lbody{padding:11px 14px 13px;min-width:0;}
+  .ltitle{display:flex;align-items:center;gap:9px;margin-bottom:8px;flex-wrap:wrap;}
+  .ltitle strong{font-size:13.5px;font-weight:600;letter-spacing:.01em;}
+  .ltitle .note{font-size:11px;color:var(--faint);font-family:var(--mono);letter-spacing:.02em;}
+  .path-tag{
+    font-family:var(--mono);font-size:10px;color:var(--muted);background:#F6F4FA;
+    border:1px solid var(--line);border-radius:3px;padding:1px 5px;
+  }
+  .chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .chip{
+    font-size:11.5px;line-height:1.5;padding:3px 8px;border-radius:5px;
+    background:#FAF9FD;border:1px solid var(--line);color:var(--ink-2);
+    white-space:nowrap;
+  }
+  .chip code{font-family:var(--mono);font-size:10px;color:var(--faint);margin-left:5px;}
+  .chip.hot{
+    background:var(--violet-tint);border-color:var(--violet-tint-2);color:#4A2A9E;
+    box-shadow:inset 2px 0 0 var(--violet);
+  }
+  .chip.dat{background:var(--teal-tint);border-color:#CFE7E0;color:#155F4F;box-shadow:inset 2px 0 0 var(--teal);}
+  .chip.wr{background:var(--rose-tint);border-color:#F3D6DD;color:#9A3B4E;box-shadow:inset 2px 0 0 var(--rose);}
+  .chip.ext{background:#F8F7FB;border-color:var(--line-2);color:var(--ink-2);}
+
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin:16px 0 0;font-size:11px;color:var(--muted);}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle;font-style:normal;}
+  .legend .a{background:var(--violet);}
+  .legend .b{background:var(--teal);}
+  .legend .c{background:var(--rose);}
+  .legend .d{background:var(--line-2);}
+
+  /* ---------- crosscut ---------- */
+  .crosscut{
+    margin-top:8px;border:1px dashed var(--line-2);border-radius:10px;
+    background:repeating-linear-gradient(135deg,#FCFBFE,#FCFBFE 10px,#F8F6FC 10px,#F8F6FC 20px);
+    padding:12px 14px 14px;
+  }
+  .crosscut .cc-label{
+    font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--faint);margin-bottom:9px;display:flex;align-items:center;gap:8px;
+  }
+  .crosscut .cc-label::after{content:"";height:1px;flex:1;background:var(--line-2);}
+
+  /* ---------- flow ---------- */
+  .flow{display:grid;grid-template-columns:repeat(9,1fr);gap:0;margin-top:6px;}
+  .step{position:relative;padding:14px 10px 12px;background:var(--paper);border:1px solid var(--line);border-right:0;}
+  .step:first-child{border-radius:8px 0 0 8px;}
+  .step:last-child{border-right:1px solid var(--line);border-radius:0 8px 8px 0;}
+  .step .n{font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.08em;}
+  .step .t{font-size:12px;font-weight:600;margin:3px 0 5px;letter-spacing:.01em;}
+  .step .d{font-size:10.5px;color:var(--muted);line-height:1.5;}
+  .step .tag{font-family:var(--mono);font-size:8.5px;letter-spacing:-.01em;color:var(--violet);display:block;margin-top:6px;overflow-wrap:anywhere;}
+  .step.gate{background:#FDFAF3;}
+  .step.gate .tag{color:var(--amber);}
+
+  .branch{
+    margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px;
+  }
+  .bcard{border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:12px 14px;}
+  .bcard b{font-size:12px;display:block;margin-bottom:4px;}
+  .bcard .cond{font-family:var(--mono);font-size:10px;color:var(--violet);display:block;margin-bottom:6px;}
+  .bcard p{margin:0;font-size:11.5px;color:var(--muted);}
+
+  .writeflow{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:6px;}
+  .wstep{border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:11px 12px;position:relative;}
+  .wstep::after{
+    content:"→";position:absolute;right:-9px;top:50%;transform:translateY(-50%);
+    color:var(--line-2);font-size:13px;background:var(--bg);padding:0 2px;
+  }
+  .wstep:last-child::after{display:none;}
+  .wstep .k{font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.08em;}
+  .wstep .t{font-size:11.5px;font-weight:600;margin:2px 0 3px;}
+  .wstep .d{font-size:10.5px;color:var(--muted);overflow-wrap:anywhere;}
+  .wstep.pause{background:#FDFAF3;border-color:#EFE2C8;}
+  .wstep.pause .k{color:var(--amber);}
+
+  /* ---------- roadmap ---------- */
+  .rail-h{position:relative;height:56px;margin:4px 0 26px;}
+  .rail-h .line{position:absolute;left:0;right:0;top:22px;height:2px;background:linear-gradient(90deg,var(--violet) 0%,var(--violet-2) 64%,var(--line-2) 64%,var(--line-2) 100%);}
+  .rail-h .nodes{position:absolute;inset:0;display:grid;grid-template-columns:repeat(6,1fr);}
+  .rail-h .node{position:relative;padding-top:16px;}
+  .rail-h .dot{
+    width:11px;height:11px;border-radius:50%;background:var(--paper);
+    border:2px solid var(--violet);margin:0 auto 6px;position:relative;z-index:2;
+  }
+  .rail-h .node.next .dot{border-color:var(--line-2);border-style:dashed;}
+  .rail-h .lbl{font-family:var(--mono);font-size:9px;color:var(--faint);text-align:center;letter-spacing:.04em;}
+
+  .phases{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .phase{
+    border:1px solid var(--line);border-radius:10px;background:var(--paper);
+    padding:15px 16px 14px;display:flex;flex-direction:column;
+  }
+  .phase.cur{border-color:var(--violet-tint-2);box-shadow:0 0 0 3px var(--violet-tint);}
+  .phase.next{border-style:dashed;background:#FCFBFE;}
+  .ph-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
+  .ph-id{font-family:var(--mono);font-size:10px;color:var(--violet);letter-spacing:.08em;}
+  .ph-st{font-size:9.5px;font-family:var(--mono);padding:1px 6px;border-radius:3px;letter-spacing:.04em;}
+  .st-done{background:var(--teal-tint);color:var(--teal);}
+  .st-cur{background:var(--violet-tint);color:var(--violet);}
+  .st-next{background:#F2F0F6;color:var(--muted);}
+  .phase h4{font-size:14px;margin:0 0 2px;font-weight:650;letter-spacing:-.005em;}
+  .ph-date{font-family:var(--mono);font-size:9.5px;color:var(--faint);margin-bottom:10px;}
+  .ph-goal{font-size:11.5px;color:var(--muted);margin:0 0 10px;padding-bottom:10px;border-bottom:1px solid var(--line);}
+  .phase ul{margin:0 0 8px;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:5px;}
+  .phase li{font-size:11px;color:var(--ink-2);padding-left:12px;position:relative;line-height:1.55;}
+  .phase li::before{content:"";position:absolute;left:0;top:6px;width:4px;height:4px;border-radius:50%;background:var(--violet-tint-2);}
+  .phase.next li::before{background:var(--line-2);}
+  .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:auto;padding-top:12px;border-top:1px dashed var(--line);}
+  .tag-m{font-family:var(--mono);font-size:9px;color:var(--muted);background:#F7F5FB;border-radius:3px;padding:1px 5px;}
+
+  /* ---------- table ---------- */
+  table{width:100%;border-collapse:collapse;font-size:11.5px;background:var(--paper);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  thead th{
+    text-align:left;font-size:10px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;
+    color:var(--faint);font-weight:500;padding:9px 12px;background:#FAF9FD;border-bottom:1px solid var(--line);
+  }
+  tbody td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink-2);}
+  tbody tr:last-child td{border-bottom:0;}
+  tbody tr:hover td{background:#FCFBFE;}
+  td.mono,th.mono{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap;}
+  .risk-h{color:var(--rose);}
+  .risk-m{color:var(--amber);}
+  .risk-l{color:var(--teal);}
+
+  /* ---------- debt ---------- */
+  .debt{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .dcard{border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:14px 16px;}
+  .dcard.p0{border-top:3px solid var(--rose);}
+  .dcard.p1{border-top:3px solid var(--amber);}
+  .dcard.p2{border-top:3px solid var(--teal);}
+  .dcard .lv{font-family:var(--mono);font-size:10px;letter-spacing:.1em;}
+  .dcard.p0 .lv{color:var(--rose);}
+  .dcard.p1 .lv{color:var(--amber);}
+  .dcard.p2 .lv{color:var(--teal);}
+  .dcard h5{font-size:12px;margin:3px 0 10px;font-weight:600;}
+  .dcard ol{margin:0;padding-left:16px;font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:6px;}
+
+  /* ---------- facts ---------- */
+  .facts{border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:16px 18px;margin-top:16px;}
+  .facts p{margin:0 0 8px;font-size:11.5px;color:var(--muted);}
+  .facts p:last-child{margin-bottom:0;}
+  .facts b{color:var(--ink-2);font-weight:600;}
+
+  footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);font-size:10.5px;color:var(--faint);display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;font-family:var(--mono);}
+
+  @media (max-width:980px){
+    .wrap{padding:32px 20px 60px;}
+    h1{font-size:26px;}
+    .flow{grid-template-columns:repeat(3,1fr);gap:8px;}
+    .step{border-right:1px solid var(--line);border-radius:8px !important;}
+    .branch,.phases,.debt{grid-template-columns:1fr;}
+    .writeflow{grid-template-columns:1fr 1fr;}
+    .wstep::after{display:none;}
+    .stat{min-width:calc(50% - 1px);}
+    .rail-h .nodes{grid-template-columns:repeat(3,1fr);row-gap:16px;}
+    .rail-h{height:auto;}
+    .rail-h .line{display:none;}
+    .chip{white-space:normal;}
+    .layer{grid-template-columns:56px 1fr;}
+    .ltitle .note{font-size:10px;}
+    table{font-size:10.5px;table-layout:fixed;}
+    td.mono,th.mono{white-space:normal;overflow-wrap:anywhere;}
+    tbody td,thead th{padding:8px 8px;overflow-wrap:anywhere;}
+  }
+  @media print{
+    body{background:#fff;font-size:11px;}
+    .wrap{padding:0;max-width:none;}
+    section{page-break-inside:avoid;margin-top:28px;}
+    .layer,.phase,.dcard,table{page-break-inside:avoid;}
+    #roadmap{page-break-before:always;}
+    .chip,.step,.phase{box-shadow:none !important;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">ARCHITECTURE BLUEPRINT · v3.1.0</div>
+  <h1>有邻 · 项目框架图与技术路线图</h1>
+  <p class="lede">
+    一个「对话即入口」的校园服务系统：用户用一句自然语言完成查通知、报修、找失物、发论坛帖；
+    系统的复杂度不在页面，而在<strong>把不确定的自然语言收敛成一条可确认、可追溯、可回退的执行路径</strong>。
+    下图按代码实际分层绘制，标注了热路径、读写分界与降级点。
+  </p>
+  <div class="stats">
+    <div class="stat"><b>8</b><span>意图分类</span></div>
+    <div class="stat"><b>11</b><span>校园工具（7读/4写）</span></div>
+    <div class="stat"><b>18</b><span>注册工具总数</span></div>
+    <div class="stat"><b>14</b><span>API 路由</span></div>
+    <div class="stat"><b>14</b><span>数据表</span></div>
+    <div class="stat"><b>105</b><span>UI 组件</span></div>
+  </div>
+</header>
+
+<!-- ================= 01 框架图 ================= -->
+<section id="framework">
+  <div class="sec-head"><span class="sec-no">01</span><h2>项目框架图</h2></div>
+  <p class="sec-sub">
+    自上而下 8 层。紫色左边条 = 对话请求的必经热路径；绿色 = 数据与检索；红色 = 写操作（必须经过确认闸门）。
+    每层标题后的灰色小字为该层实际文件数，全部取自 <code style="font-family:var(--mono);font-size:11px;white-space:nowrap;">E:/youlin-main</code> 源码。
+  </p>
+
+  <div class="stack">
+
+    <!-- L1 -->
+    <div class="layer">
+      <div class="rail"><div class="no">01</div><div class="tp">UI / UX</div></div>
+      <div class="lbody">
+        <div class="ltitle">
+          <strong>触点与界面层</strong>
+          <span class="note">50 chat · 10 forum · 22 ui · 9 ai-elements · 13 effects</span>
+        </div>
+        <div class="chips">
+          <span class="chip">登录 / 注册 <code>(auth)/login|register</code></span>
+          <span class="chip hot">对话工作台 <code>components/chat</code></span>
+          <span class="chip">论坛列表 / 详情 <code>components/forum</code></span>
+          <span class="chip hot">处理过程卡片 <code>campus-trace</code></span>
+          <span class="chip">工具调用胶囊 <code>campus-tool-chip</code></span>
+          <span class="chip">要闻三格 <code>bulletin-board</code></span>
+          <span class="chip">基础组件 <code>radix + tailwind v4</code></span>
+          <span class="chip">内容渲染 <code>streamdown / katex</code></span>
+          <span class="chip">动效品牌 <code>effects</code></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- L2 -->
+    <div class="layer">
+      <div class="rail"><div class="no">02</div><div class="tp">ROUTING</div></div>
+      <div class="lbody">
+        <div class="ltitle">
+          <strong>路由与页面层</strong>
+          <span class="note">6 pages · 3 layouts · App Router (RSC)</span>
+        </div>
+        <div class="chips">
+          <span class="chip">/ 对话首页</span>
+          <span class="chip">/chat/[id] 会话</span>
+          <span class="chip">/forum 列表</span>
+          <span class="chip">/forum/[id] 详情</span>
+          <span class="chip">深链 <code>?c=分类</code></span>
+          <span class="chip">旧链兼容 <code>?post= → 新路由</code></span>
+          <span class="chip">cacheComponents · reactCompiler</span>
+          <span class="chip">basePath <code>/demo</code></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- L3 -->
+    <div class="layer">
+      <div class="rail"><div class="no">03</div><div class="tp">API</div></div>
+      <div class="lbody">
+        <div class="ltitle">
+          <strong>接口层 · 14 个 Route Handler</strong>
+          <span class="note">SSE 流式 · maxDuration 60s</span>
+        </div>
+        <div class="chips">
+          <span class="chip hot">POST /api/chat <code>SSE 主通道</code></span>
+          <span class="chip">GET /api/chat/[id]/stream <code>断线续传</code></span>
+          <span class="chip">/api/forum <code>GET·POST·PATCH·DELETE</code></span>
+          <span class="chip">/api/forum/comments</span>
+          <span class="chip">/api/forum/claims <code>认领私信</code></span>
+          <span class="chip">/api/history · /api/messages</span>
+          <span class="chip">/api/document · /api/files/upload</span>
+          <span class="chip">/api/vote · /api/models · /api/suggestions</span>
+          <span class="chip">/api/auth/[...nextauth] · /api/auth/guest</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- L4 -->
+    <div class="layer">
+      <div class="rail"><div class="no">04</div><div class="tp">ENGINE</div></div>
+      <div class="lbody">
+        <div class="ltitle">
+          <strong>编排层 · 唯一执行路径</strong>
+          <span class="note">lib/campus/engine.ts 324 行</span>
+        </div>
+        <div class="chips">
+          <span class="chip hot">runCampusEngine <code>入口</code></span>
+          <span class="chip hot">classifyCampus <code>8 类意图</code></span>
+          <span class="chip">routeCampus <code>指代补全 / 意图继承</code></span>
+          <span class="chip wr">toolPolicy <code>7 读 / 4 写</code></span>
+          <span class="chip wr">CampusPending <code>计划挂起 30min</code></span>
+          <span class="chip wr">原子 UPDATE <code>防重复执行</code></span>
+          <span class="chip">CampusTrace <code>全链路埋点</code></span>
+          <span class="chip">发帖分支 <code>草稿 → 脱敏 → 预览</code></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- L5 -->
+    <div class="layer">
+      <div class="rail"><div class="no">05</div><div class="tp">TOOLS</div></div>
+      <div class="lbody">
+        <div class="ltitle">
+          <strong>能力层 · 18 个工具</strong>
+          <span class="note">lib/ai/tools/*  ·  zod 入参校验</span>
+        </div>
+        <div class="chips">
+          <span class="chip hot">读 7：searchNotice · searchCampus · searchForum</span>
+          <span class="chip hot">searchLost · searchRepair · campusCard · queryAccess</span>
+          <span class="chip wr">写 4：registerLost · closeLost · createRepair · publishForum</span>
+          <span class="chip">文档 4：create / edit / update / requestSuggestions</span>
+          <span class="chip">媒体 2：searchImages · grabImage</span>
+          <span class="chip">新闻 1：searchNews</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- L6 -->
+    <div class="layer">
+      <div class="rail"><div class="no">06</div><div class="tp">DOMAIN</div></div>
+      <div class="lbody">
+        <div class="ltitle">
+          <strong>领域服务层</strong>
+          <span class="note">lib/campus/ 19 文件 · 无 UI 依赖</span>
+        </div>
+        <div class="chips">
+          <span class="chip">失物 <code>lost-found</code></span>
+          <span class="chip">认领私信 <code>claims</code></span>
+          <span class="chip">隐私脱敏 <code>privacy</code></span>
+          <span class="chip">帖子 <code>forum</code></span>
+          <span class="chip">评论 <code>forum-comments</code></span>
+          <span class="chip">语义匹配 <code>forum-match (LLM)</code></span>
+          <span class="chip">帖子草稿 <code>forum-draft (LLM)</code></span>
+          <span class="chip">通知 <code>notices</code></span>
+          <span class="chip">报修 <code>repairs (内存)</code></span>
+          <span class="chip">校园卡 <code>card-service</code></span>
+          <span class="chip">门禁 <code>access</code></span>
+          <span class="chip">内置问答 <code>knowledge</code></span>
+          <span class="chip">要闻 <code>bulletins</code></span>
+          <span class="chip">测试夹具 <code>harness</code></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- L7 -->
+    <div class="layer">
+      <div class="rail"><div class="no">07</div><div class="tp">DATA</div></div>
+      <div class="lbody">
+        <div class="ltitle">
+          <strong>数据与检索层</strong>
+          <span class="note">Drizzle ORM · 14 表 · JSON 向量索引</span>
+        </div>
+        <div class="chips">
+          <span class="chip dat">业务 7：User · Chat · Message_v2 · Vote_v2</span>
+          <span class="chip dat">Document · Suggestion · Stream</span>
+          <span class="chip dat">校园 7：ForumPost · ForumComment · LostItem</span>
+          <span class="chip dat">LostClaimThread · LostClaimMessage · CampusPending · CampusTrace</span>
+          <span class="chip dat">PGlite 本地 <code>data/campus-db</code></span>
+          <span class="chip dat">postgres-js <code>POSTGRES_URL</code></span>
+          <span class="chip dat">启动自动迁移 <code>lib/db/migrations</code></span>
+          <span class="chip dat">RAG 索引 <code>data/rag/index.json</code></span>
+          <span class="chip dat">文件 <code>public/uploads ↔ Blob</code></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- L8 -->
+    <div class="layer">
+      <div class="rail"><div class="no">08</div><div class="tp">EXTERNAL</div></div>
+      <div class="lbody">
+        <div class="ltitle">
+          <strong>模型与外部服务</strong>
+          <span class="note">可降级 · 无 key 也能跑规则链路</span>
+        </div>
+        <div class="chips">
+          <span class="chip ext">DeepSeek <code>OpenAI 兼容</code></span>
+          <span class="chip ext">主回答 · 会话标题</span>
+          <span class="chip ext">论坛语义匹配 · 发帖结构化</span>
+          <span class="chip ext">降级 <code>localChatModel 占位</code></span>
+          <span class="chip ext">嵌入 <code>Ollama nomic-embed-text 768</code></span>
+          <span class="chip ext">嵌入备选 <code>OpenAI</code></span>
+          <span class="chip ext">Bing 图搜 <code>DDG 海外备</code></span>
+          <span class="chip ext">人民网检索 API</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><i class="a"></i>对话热路径</span>
+    <span><i class="b"></i>数据 / 检索</span>
+    <span><i class="c"></i>写操作（需确认）</span>
+    <span><i class="d"></i>外围 / 可选依赖</span>
+  </div>
+
+  <!-- 横切 -->
+  <h3>横切关注点（贯穿全部 8 层）</h3>
+  <div class="crosscut">
+    <div class="cc-label">CROSS-CUTTING</div>
+    <div class="chips">
+      <span class="chip">认证 <code>NextAuth v5 · Credentials · bcrypt</code></span>
+      <span class="chip">防爬 <code>botid</code></span>
+      <span class="chip">限流 <code>IP + 每小时消息配额</code></span>
+      <span class="chip">可观测 <code>CampusTrace 落库 + data-* 流事件</code></span>
+      <span class="chip">隐私 <code>redactPublicText 发布前脱敏</code></span>
+      <span class="chip">主题 <code>浅/深双套 · CSS 变量</code></span>
+      <span class="chip">质量 <code>Biome · Playwright · node:test</code></span>
+      <span class="chip">部署 <code>Vercel · Redis 可选 · basePath</code></span>
+    </div>
+  </div>
+
+  <!-- 请求链路 -->
+  <h3>一条请求的 9 站（对话主链路）</h3>
+  <div class="flow">
+    <div class="step"><div class="n">01</div><div class="t">用户输入</div><div class="d">文本 / 附件，前端写入本地消息</div><span class="tag">multimodal-input</span></div>
+    <div class="step"><div class="n">02</div><div class="t">双重校验</div><div class="d">botid 判定 + 会话身份</div><span class="tag">checkBotId / auth()</span></div>
+    <div class="step"><div class="n">03</div><div class="t">双闸限流</div><div class="d">IP 频次 + 每小时条数配额</div><span class="tag">checkIpRateLimit</span></div>
+    <div class="step"><div class="n">04</div><div class="t">落库</div><div class="d">用户消息先持久化，再进引擎</div><span class="tag">saveMessages</span></div>
+    <div class="step gate"><div class="n">05</div><div class="t">开流</div><div class="d">先写 start 再写 data，避免影子卡片</div><span class="tag">UIMessageStream</span></div>
+    <div class="step"><div class="n">06</div><div class="t">意图路由</div><div class="d">8 类分类 + 指代补全 + 发帖直判</div><span class="tag">runCampusEngine</span></div>
+    <div class="step gate"><div class="n">07</div><div class="t">读写分流</div><div class="d">读即执行；写先挂起等确认</div><span class="tag">toolPolicy</span></div>
+    <div class="step"><div class="n">08</div><div class="t">回答成形</div><div class="d">规则直出，或带 RAG 上下文交给模型</div><span class="tag">streamText</span></div>
+    <div class="step"><div class="n">09</div><div class="t">收尾</div><div class="d">埋点落库、帖子链接、消息持久化</div><span class="tag">CampusTrace · onEnd</span></div>
+  </div>
+
+  <div class="branch">
+    <div class="bcard">
+      <b>直出模式</b>
+      <span class="cond">kind ≠ unknown/qa ｜ 或无模型 key</span>
+      <p>引擎已产出成稿文案与来源，直接写入 text-delta 流。确定性最高，也保证无模型时系统仍可用。</p>
+    </div>
+    <div class="bcard">
+      <b>模型合成模式</b>
+      <span class="cond">kind = unknown ｜ 或 qa 且命中证据</span>
+      <p>检索结果（doc · 相似度 · 片段）拼进 system 提示，由模型组织语言并标注来源；相似度低于 0.5 的片段丢弃。</p>
+    </div>
+  </div>
+
+  <h3>写操作的五拍闸门（防误发、防重复）</h3>
+  <div class="writeflow">
+    <div class="wstep"><div class="k">STEP 1</div><div class="t">生成计划</div><div class="d">工具名 + 入参 + 人话描述</div></div>
+    <div class="wstep"><div class="k">STEP 2</div><div class="t">脱敏预览</div><div class="d">标题/正文/地点/时间统一过隐私规则</div></div>
+    <div class="wstep pause"><div class="k">STEP 3 · 闸门</div><div class="t">挂起待确认</div><div class="d">CampusPending 落库，同会话仅一条 pending</div></div>
+    <div class="wstep"><div class="k">STEP 4</div><div class="t">原子执行</div><div class="d">UPDATE…RETURNING 抢占，30 分钟过期</div></div>
+    <div class="wstep"><div class="k">STEP 5</div><div class="t">回执 + 埋点</div><div class="d">写入 done/failed，输出编号与后续指引</div></div>
+  </div>
+
+  <div class="facts">
+    <p><b>框架的三个判断：</b>① 引擎是唯一执行路径——模型只负责「说」，不负责「做」，所以没有 tool-calling 发散的风险；② 写操作全部收敛到 Pending 闸门，是这套系统最关键的可靠性设计；③ 每条回答都带 sources 与 evidence，可追溯到具体表或文档。</p>
+    <p><b>代价：</b>意图靠正则分类（8 类之外一律 unknown），扩展新业务要改代码而非加配置；论坛匹配与发帖结构化各多一次模型调用，首字延迟上升。</p>
+  </div>
+</section>
+
+<!-- ================= 02 路线图 ================= -->
+<section id="roadmap">
+  <div class="sec-head"><span class="sec-no">02</span><h2>技术路线图</h2></div>
+  <p class="sec-sub">
+    项目在两天内从模板推进到可用系统，阶段是能力叠加而非日历排期。前三段为已落地能力，第四段是当前收口，
+    第五段是上线前必须补齐的工程债。
+  </p>
+
+  <div class="rail-h">
+    <div class="line"></div>
+    <div class="nodes">
+      <div class="node"><div class="dot"></div><div class="lbl">P0 骨架</div></div>
+      <div class="node"><div class="dot"></div><div class="lbl">P1 引擎</div></div>
+      <div class="node"><div class="dot"></div><div class="lbl">P2 论坛</div></div>
+      <div class="node"><div class="dot"></div><div class="lbl">P3 知识库</div></div>
+      <div class="node"><div class="dot"></div><div class="lbl">P4 媒体</div></div>
+      <div class="node next"><div class="dot"></div><div class="lbl">P5 生产化</div></div>
+    </div>
+  </div>
+
+  <div class="phases">
+    <div class="phase">
+      <div class="ph-top"><span class="ph-id">PHASE 0</span><span class="ph-st st-done">已完成</span></div>
+      <h4>骨架与身份</h4>
+      <div class="ph-date">2026-11-17 · 基座</div>
+      <p class="ph-goal">把 Next.js 模板跑成一台能存会话、能登录、能流式回答的机器。</p>
+      <ul>
+        <li>Next.js 16 + React 19 + AI SDK 7 落地</li>
+        <li>NextAuth Credentials + bcrypt，游客态</li>
+        <li>PGlite 单进程库 + 启动自动迁移</li>
+        <li>SSE 流式与消息持久化打通</li>
+      </ul>
+      <div class="tags"><span class="tag-m">next@16.2.10</span><span class="tag-m">react@19.2.7</span><span class="tag-m">pglite</span></div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-top"><span class="ph-id">PHASE 1</span><span class="ph-st st-done">已完成</span></div>
+      <h4>校园引擎</h4>
+      <div class="ph-date">2026-11-17 · 核心</div>
+      <p class="ph-goal">自然语言 → 8 类意图 → 11 个工具，读直通、写必确认。</p>
+      <ul>
+        <li>classifyCampus 八类意图 + 上一轮意图继承</li>
+        <li>toolPolicy 读写分治，写操作 confirmed 才执行</li>
+        <li>CampusPending 计划挂起 + 原子抢占 + 30min TTL</li>
+        <li>CampusTrace 全链路埋点，前端可视化处理过程</li>
+        <li>隐私脱敏：发布前统一过滤证件号/学号/联系方式</li>
+      </ul>
+      <div class="tags"><span class="tag-m">engine.ts</span><span class="tag-m">CampusPending</span><span class="tag-m">redact</span></div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-top"><span class="ph-id">PHASE 2</span><span class="ph-st st-done">已完成</span></div>
+      <h4>论坛与失物闭环</h4>
+      <div class="ph-date">11-17 → 11-18 · 业务</div>
+      <p class="ph-goal">从「登记失物」走到「找到人、能联系、能结案」。</p>
+      <ul>
+        <li>帖子 / 评论 / 两级回复 / 我的帖子管理</li>
+        <li>认领私信 LostClaimThread + Message</li>
+        <li>LLM 语义匹配帖子，失败回退关键词</li>
+        <li>一句话发帖：LLM 结构化出标题/分类/地点/时间</li>
+        <li>前端重构为 /forum + /forum/[id]，去装饰化</li>
+      </ul>
+      <div class="tags"><span class="tag-m">forum-match</span><span class="tag-m">forum-draft</span><span class="tag-m">claims</span></div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-top"><span class="ph-id">PHASE 3</span><span class="ph-st st-done">已完成</span></div>
+      <h4>知识库检索</h4>
+      <div class="ph-date">2026-11-17 · 数据</div>
+      <p class="ph-goal">让「奖学金怎么申请」这类问题有据可依，不靠模型编。</p>
+      <ul>
+        <li>PDF → 分页抽取 → 800/120 分块</li>
+        <li>Ollama nomic-embed-text 768 维嵌入</li>
+        <li>JSON 索引 + 余弦 topK，阈值 0.5 过滤</li>
+        <li>qa 意图的检索证据直接进入模型上下文</li>
+        <li>内置文章作为知识库不可用时的兜底</li>
+      </ul>
+      <div class="tags"><span class="tag-m">lib/rag/*</span><span class="tag-m">index.json</span><span class="tag-m">minScore .5</span></div>
+    </div>
+
+    <div class="phase cur">
+      <div class="ph-top"><span class="ph-id">PHASE 4</span><span class="ph-st st-cur">当前</span></div>
+      <h4>媒体、新闻与体验收口</h4>
+      <div class="ph-date">2026-11-18 · v3.1.0</div>
+      <p class="ph-goal">补齐「看得见」的能力，并把论坛从 demo 感拉回内容优先。</p>
+      <ul>
+        <li>Bing 图搜 + 逐跳校验抓取落盘（防 SSRF）</li>
+        <li>人民网检索 API 接入，按时间倒序去重</li>
+        <li>论坛要闻三格并置，共享 5.5s 节拍整组翻页</li>
+        <li>CSS 变量改不透明实色，修 Lightning CSS 色彩错编</li>
+        <li>深色模式与 390px 移动端逐项验证</li>
+      </ul>
+      <div class="tags"><span class="tag-m">image-search</span><span class="tag-m">news-search</span><span class="tag-m">bulletin-board</span></div>
+    </div>
+
+    <div class="phase next">
+      <div class="ph-top"><span class="ph-id">PHASE 5</span><span class="ph-st st-next">待开工</span></div>
+      <h4>生产化</h4>
+      <div class="ph-date">上线前 · 工程债</div>
+      <p class="ph-goal">从「本机开发模式可体验」走到「能对外开」，这一段是硬门槛。</p>
+      <ul>
+        <li>类型错误清零，pnpm build 稳定通过</li>
+        <li>主链路 e2e：注册 → 发帖 → 认领 → 结案</li>
+        <li>Postgres / Redis / Blob 三件套端到端验证</li>
+        <li>报修工单持久化，脱离进程内存</li>
+        <li>内容治理：审核、举报、限流升级为分布式</li>
+      </ul>
+      <div class="tags"><span class="tag-m">build</span><span class="tag-m">e2e</span><span class="tag-m">postgres</span></div>
+    </div>
+  </div>
+
+  <h3>技术栈矩阵与风险</h3>
+  <table>
+    <thead>
+      <tr><th style="width:13%">层</th><th style="width:26%">选型</th><th style="width:31%">承担什么</th><th style="width:30%">风险判断</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>框架</td><td class="mono">Next.js 16.2 · React 19.2</td><td>RSC 页面、流式接口、缓存组件、React Compiler</td><td class="risk-m">前沿版本，与依赖类型定义存在错位，build 未稳定通过</td></tr>
+      <tr><td>模型</td><td class="mono">AI SDK 7 · DeepSeek</td><td>流式回答、标题生成、论坛匹配、发帖结构化</td><td class="risk-l">有本地占位降级，无 key 也能跑规则链路</td></tr>
+      <tr><td>数据</td><td class="mono">Drizzle 0.45 · PGlite / postgres-js</td><td>14 张表，本地单进程 ↔ 可选 Postgres</td><td class="risk-m">PGlite 进程被强杀可能写坏文件；生产路径未端到端验证</td></tr>
+      <tr><td>检索</td><td class="mono">JSON 索引 + 余弦相似</td><td>PDF 知识库问答，topK + 阈值过滤</td><td class="risk-m">全量内存比对，文档量上去后延迟与内存线性增长</td></tr>
+      <tr><td>样式</td><td class="mono">Tailwind v4 · Radix · CSS 变量</td><td>105 个组件、浅深双主题、动效层</td><td class="risk-l">Lightning CSS 对带 alpha 的 oklch 有错编，需用实色</td></tr>
+      <tr><td>外部</td><td class="mono">Bing 图搜 · 人民网 API</td><td>配图检索、新闻检索，均无需 key</td><td class="risk-m">依赖第三方页面结构，随时可能失效；仅覆盖人民网系</td></tr>
+      <tr><td>质量</td><td class="mono">Biome · Playwright · node:test</td><td>格式与 lint、页面 e2e、引擎单测</td><td class="risk-l">引擎测试 6/6 通过；页面 e2e 覆盖仍薄</td></tr>
+    </tbody>
+  </table>
+
+  <h3>技术债优先级</h3>
+  <div class="debt">
+    <div class="dcard p0">
+      <div class="lv">P0 · 阻断上线</div>
+      <h5>不解决就不能对外</h5>
+      <ol>
+        <li>TypeScript 类型错误清零，<code style="font-family:var(--mono);font-size:10px;">pnpm build</code> 可复现通过</li>
+        <li>全新安装 → 注册 → 完整主链路 e2e 验证</li>
+        <li>Postgres / Redis / Blob 生产路径逐条打通</li>
+        <li>真实学校资料替换样本数据，明确免责边界</li>
+      </ol>
+    </div>
+    <div class="dcard p1">
+      <div class="lv">P1 · 影响可靠性</div>
+      <h5>规模一上来就疼</h5>
+      <ol>
+        <li>报修工单从内存迁到表，重启不丢</li>
+        <li>检索升级 pgvector + 关键词混合，支持增量索引</li>
+        <li>限流从单机内存改为分布式计数</li>
+        <li>论坛匹配与发帖结构化合并调用，降首字延迟</li>
+      </ol>
+    </div>
+    <div class="dcard p2">
+      <div class="lv">P2 · 体验与治理</div>
+      <h5>能跑之后再打磨</h5>
+      <ol>
+        <li>内容审核与举报入口，公开内容可追责</li>
+        <li>站内私信通知，摆脱手动刷新</li>
+        <li>意图分类从正则迁到模型/配置，降低扩展成本</li>
+        <li>可访问性复查与 Trace 看板</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="facts">
+    <p><b>路线图的判断依据：</b>P0–P4 都是「能力」，P5 才是「产品」。当前系统在功能完整度上已经能演示闭环，但构建、部署、数据治理三条线都还停留在本机验证，任何一条没过都不适合开放给真实用户。</p>
+  </div>
+</section>
+
+<footer>
+  <span>有邻 v3.1.0 · 框架事实取自 E:/youlin-main 源码</span>
+  <span>2026-11-18 · 8 层 / 18 工具 / 14 表 / 14 路由</span>
+</footer>
+
+</div>
+</body>
+</html>

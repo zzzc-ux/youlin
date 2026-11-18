@@ -1,11 +1,17 @@
-import { ForumBoard } from "@/components/chat/forum-board";
+import { redirect } from "next/navigation";
+import { ForumList } from "@/components/forum/forum-list";
+import { listNotices } from "@/lib/campus/notices";
 
 export default async function ForumPage({
   searchParams,
 }: {
-  searchParams: Promise<{ post?: string | string[] }>;
+  searchParams: Promise<{ c?: string | string[]; post?: string | string[] }>;
 }) {
-  const { post } = await searchParams;
+  const { c, post } = await searchParams;
   const postId = typeof post === "string" ? post : undefined;
-  return <ForumBoard initialPostId={postId} key={postId ?? "all"} />;
+  if (postId) {
+    redirect(`/forum/${encodeURIComponent(postId)}`);
+  }
+  const category = typeof c === "string" ? c : undefined;
+  return <ForumList initialCategory={category} notices={listNotices(3)} />;
 }

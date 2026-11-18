@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>论坛前端改造设计方案 v1.0</title>
+<style>
+  :root{
+    --paper:#FBFAF7;
+    --surface:#FFFFFF;
+    --ink:#1A1917;
+    --ink-2:#4F4B45;
+    --ink-3:#75706A;
+    --line:#E6E1D8;
+    --line-soft:#F1EDE5;
+    --accent:#2E5D4E;
+    --accent-soft:#EAF0EC;
+    --warn:#B4552D;
+    --font:-apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    --mono:"SF Mono","Cascadia Code","JetBrains Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:var(--font);font-size:15px;line-height:1.75;
+    font-feature-settings:"tnum";
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent);text-decoration:none;}
+  a:hover{text-decoration:underline;text-underline-offset:3px;}
+
+  .shell{display:grid;grid-template-columns:212px minmax(0,1fr);gap:64px;max-width:1160px;margin:0 auto;padding:0 40px 120px;}
+  @media (max-width:940px){.shell{grid-template-columns:1fr;gap:0;padding:0 20px 80px;} .toc{display:none;}}
+
+  /* ---------- TOC ---------- */
+  .toc{position:sticky;top:0;align-self:start;height:100vh;padding:56px 0 40px;overflow:auto;}
+  .toc__brand{font-size:13px;letter-spacing:.08em;color:var(--ink-3);margin-bottom:24px;}
+  .toc__brand b{display:block;color:var(--ink);font-size:14px;letter-spacing:0;margin-top:4px;}
+  .toc ol{list-style:none;margin:0;padding:0;}
+  .toc li{margin:0;}
+  .toc a{display:block;padding:5px 0 5px 0;font-size:13px;color:var(--ink-3);}
+  .toc a:hover{color:var(--ink);text-decoration:none;}
+  .toc a span{display:inline-block;width:26px;font-family:var(--mono);font-size:11px;color:#B6B1A8;}
+
+  /* ---------- type ---------- */
+  .cover{padding:64px 0 8px;border-bottom:1px solid var(--line);margin-bottom:8px;}
+  .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:0 0 18px;}
+  h1{font-size:34px;line-height:1.32;font-weight:600;letter-spacing:-.01em;margin:0 0 14px;}
+  .lede{font-size:16px;color:var(--ink-2);max-width:660px;margin:0 0 28px;}
+  .meta-row{display:flex;flex-wrap:wrap;gap:0;font-size:12.5px;color:var(--ink-3);padding-bottom:28px;}
+  .meta-row div{padding-right:28px;margin-right:28px;border-right:1px solid var(--line);}
+  .meta-row div:last-child{border:0;}
+  .meta-row b{display:block;color:var(--ink);font-weight:500;font-size:13px;margin-top:2px;}
+
+  section{padding:52px 0 4px;border-top:1px solid var(--line-soft);margin-top:20px;}
+  section:first-of-type{border-top:0;}
+  .num{font-family:var(--mono);font-size:12px;color:#B6B1A8;letter-spacing:.1em;display:block;margin-bottom:8px;}
+  h2{font-size:23px;line-height:1.4;font-weight:600;letter-spacing:-.005em;margin:0 0 8px;}
+  h2 .sub{display:block;font-size:14px;font-weight:400;color:var(--ink-3);margin-top:6px;letter-spacing:0;}
+  h3{font-size:16px;font-weight:600;margin:34px 0 10px;}
+  h4{font-size:14px;font-weight:600;margin:22px 0 6px;color:var(--ink);}
+  p{margin:0 0 14px;color:var(--ink-2);}
+  strong{color:var(--ink);font-weight:600;}
+  ul,ol{margin:0 0 16px;padding-left:20px;color:var(--ink-2);}
+  li{margin:0 0 7px;}
+  li::marker{color:#C4BFB6;}
+  code{font-family:var(--mono);font-size:12.5px;background:var(--line-soft);padding:1px 5px;border-radius:4px;color:var(--ink);}
+  small{font-size:12.5px;color:var(--ink-3);}
+
+  /* ---------- blocks ---------- */
+  .quote{border-left:2px solid var(--accent);padding:2px 0 2px 18px;margin:22px 0;color:var(--ink);font-size:15.5px;}
+  .quote b{color:var(--accent);}
+  .note{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px 18px;margin:18px 0;font-size:13.5px;color:var(--ink-2);}
+  .note b{color:var(--ink);}
+  .warn{border-left:2px solid var(--warn);padding-left:16px;margin:18px 0;}
+  .warn b{color:var(--warn);}
+
+  table{width:100%;border-collapse:collapse;margin:16px 0 22px;font-size:13.5px;}
+  th{text-align:left;font-weight:500;color:var(--ink-3);font-size:12px;letter-spacing:.06em;padding:0 12px 8px 0;border-bottom:1px solid var(--line);}
+  td{padding:11px 12px 11px 0;border-bottom:1px solid var(--line-soft);vertical-align:top;color:var(--ink-2);}
+  td:first-child{color:var(--ink);}
+  td code{font-size:12px;}
+  table.compact td{padding:8px 12px 8px 0;font-size:13px;}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  @media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr;}}
+
+  .rule{display:grid;grid-template-columns:26px 1fr;gap:12px;margin:0 0 22px;}
+  .rule__n{font-family:var(--mono);font-size:12px;color:#C4BFB6;padding-top:4px;}
+  .rule h4{margin:0 0 4px;font-size:14.5px;}
+  .rule p{margin:0 0 6px;font-size:13.5px;}
+  .rule .do,.rule .dont{font-size:12.5px;line-height:1.9;}
+  .rule .do b{color:var(--accent);font-weight:600;}
+  .rule .dont b{color:var(--warn);font-weight:600;}
+
+  /* swatches */
+  .sw{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0 8px;}
+  @media (max-width:760px){.sw{grid-template-columns:repeat(2,1fr);}}
+  .sw__i{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface);}
+  .sw__c{height:56px;}
+  .sw__t{padding:8px 10px;font-size:11.5px;font-family:var(--mono);color:var(--ink-2);line-height:1.6;}
+  .sw__t b{display:block;font-family:var(--font);font-size:12.5px;color:var(--ink);font-weight:500;}
+
+  /* type scale demo */
+  .scale{border-top:1px solid var(--line-soft);}
+  .scale__row{display:grid;grid-template-columns:120px minmax(0,1fr);gap:20px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--line-soft);}
+  .scale__k{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);line-height:1.7;}
+
+  /* ---------- mockup ---------- */
+  .frame{border:1px solid var(--line);border-radius:10px;background:var(--paper);overflow:hidden;margin:20px 0 10px;}
+  .frame__bar{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);background:#F5F2EC;}
+  .frame__dots{display:flex;gap:5px;}
+  .frame__dots i{width:7px;height:7px;border-radius:50%;background:#D8D2C7;display:block;}
+  .frame__url{font-family:var(--mono);font-size:11px;color:var(--ink-3);}
+  .cap{font-size:12px;color:var(--ink-3);margin:0 0 26px;}
+
+  .mk{padding:0;font-size:14px;color:var(--ink);}
+  .mk__top{display:flex;align-items:center;gap:18px;padding:16px 28px;border-bottom:1px solid var(--line);}
+  .mk__logo{font-size:14px;font-weight:600;letter-spacing:-.01em;}
+  .mk__logo em{font-style:normal;color:var(--ink-3);font-weight:400;font-size:12px;margin-left:8px;}
+  .mk__nav{display:flex;gap:16px;margin-left:8px;font-size:13px;color:var(--ink-3);}
+  .mk__nav span.on{color:var(--ink);font-weight:500;box-shadow:inset 0 -2px 0 var(--accent);padding-bottom:2px;}
+  .mk__right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .mk__search{border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:12.5px;color:#A8A29A;background:var(--surface);min-width:150px;}
+  .mk__btn{background:var(--accent);color:#fff;font-size:12.5px;padding:6px 12px;border-radius:6px;font-weight:500;}
+
+  .mk__body{display:grid;grid-template-columns:minmax(0,1fr) 236px;gap:0;}
+  .mk__main{padding:22px 28px 26px;border-right:1px solid var(--line-soft);}
+  .mk__aside{padding:22px 22px 26px;}
+
+  .mk__title{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;}
+  .mk__title h3{font-size:19px;font-weight:600;margin:0;letter-spacing:-.01em;}
+  .mk__title span{font-size:12px;color:var(--ink-3);}
+  .mk__hint{font-size:12.5px;color:var(--ink-3);margin:0 0 18px;}
+
+  .post{padding:16px 0;border-bottom:1px solid var(--line-soft);}
+  .post__meta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-3);line-height:1;}
+  .dot{width:5px;height:5px;border-radius:50%;display:inline-block;}
+  .cat{display:inline-flex;align-items:center;gap:5px;background:#F2EFE8;color:#6B665E;padding:2px 6px 2px 5px;border-radius:4px;font-size:11.5px;}
+  .cat--warn{background:#F7EFE9;color:#9A4A28;}
+  .cat--done{background:var(--accent-soft);color:var(--accent);}
+  .post__h{font-size:15.5px;font-weight:500;color:var(--ink);margin:8px 0 5px;line-height:1.5;letter-spacing:-.005em;}
+  .post__h:hover{color:var(--accent);}
+  .post__p{font-size:13.5px;color:var(--ink-2);line-height:1.7;margin:0 0 9px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .post__foot{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-3);}
+  .ava{width:17px;height:17px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9.5px;color:#fff;font-weight:500;flex:none;}
+  .post__chips{margin-left:auto;display:flex;gap:6px;}
+  .chip{font-size:11.5px;color:#6B665E;background:#F4F1EA;padding:2px 7px;border-radius:4px;}
+
+  .side-h{font-size:12px;color:var(--ink-3);letter-spacing:.06em;margin:0 0 12px;font-weight:500;}
+  .hot{list-style:none;padding:0;margin:0 0 22px;}
+  .hot li{display:flex;gap:9px;font-size:12.5px;line-height:1.55;margin-bottom:9px;color:var(--ink-2);}
+  .hot i{font-style:normal;font-family:var(--mono);font-size:11px;color:#C4BFB6;width:10px;flex:none;padding-top:1px;}
+  .hot li:nth-child(-n+2) i{color:var(--accent);}
+  .side-li{font-size:12.5px;line-height:1.6;color:var(--ink-2);padding:8px 0;border-bottom:1px solid var(--line-soft);}
+  .side-li b{font-weight:500;color:var(--ink);}
+  .side-li span{color:var(--ink-3);}
+  .side-note{font-size:11.5px;color:var(--ink-3);line-height:1.7;margin-top:14px;}
+
+  /* detail mockup */
+  .mk2{padding:26px 32px 30px;max-width:720px;}
+  .crumb{font-size:12px;color:var(--ink-3);margin-bottom:14px;}
+  .mk2 h3{font-size:22px;font-weight:600;margin:0 0 12px;line-height:1.45;letter-spacing:-.01em;}
+  .byline{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-3);padding-bottom:16px;border-bottom:1px solid var(--line-soft);}
+  .byline b{color:var(--ink-2);font-weight:500;}
+  .mk2 p{margin:16px 0;font-size:14.5px;line-height:1.85;color:var(--ink-2);}
+  .attrs{display:flex;gap:22px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:8px;margin:18px 0;font-size:13px;}
+  .attrs div span{display:block;font-size:11px;color:var(--ink-3);line-height:1.8;}
+  .cmt{padding:16px 0;border-top:1px solid var(--line-soft);}
+  .cmt__h{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-3);margin-bottom:6px;}
+  .cmt__h b{color:var(--ink-2);font-weight:500;}
+  .cmt__b{font-size:13.5px;line-height:1.75;color:var(--ink-2);margin:0;}
+  .cmt--nest{margin-left:14px;padding-left:14px;border-left:1px solid var(--line);border-top:0;padding-top:10px;}
+  .cmt__quote{font-size:12px;color:var(--ink-3);border-left:2px solid var(--line);padding-left:8px;margin:0 0 6px;}
+
+  .badge-list{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 8px;}
+  .badge-list span{font-size:12px;color:#6B665E;background:#F2EFE8;padding:3px 9px;border-radius:4px;}
+
+  .phase{display:grid;grid-template-columns:88px 1fr;gap:20px;padding:16px 0;border-bottom:1px solid var(--line-soft);}
+  .phase__k{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);line-height:1.8;}
+  .phase h4{margin:0 0 4px;}
+  .phase p{margin:0;font-size:13.5px;}
+
+  .checklist{list-style:none;padding:0;}
+  .checklist li{display:flex;gap:10px;font-size:13.5px;color:var(--ink-2);margin-bottom:9px;}
+  .checklist li::before{content:"";width:14px;height:14px;border:1px solid #C9C3B8;border-radius:3px;flex:none;margin-top:3px;}
+
+  footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="toc">
+    <div class="toc__brand">设计方案<b>论坛前端改造 v1.0</b></div>
+    <ol>
+      <li><a href="#s1"><span>01</span>诊断：AI 味从哪里来</a></li>
+      <li><a href="#s2"><span>02</span>方向与参考坐标</a></li>
+      <li><a href="#s3"><span>03</span>六条设计原则</a></li>
+      <li><a href="#s4"><span>04</span>视觉语言</a></li>
+      <li><a href="#s5"><span>05</span>信息架构</a></li>
+      <li><a href="#s6"><span>06</span>页面预览</a></li>
+      <li><a href="#s7"><span>07</span>组件规格</a></li>
+      <li><a href="#s8"><span>08</span>内容策略</a></li>
+      <li><a href="#s9"><span>09</span>状态与边界</a></li>
+      <li><a href="#s10"><span>10</span>反 AI 味清单</a></li>
+      <li><a href="#s11"><span>11</span>响应式与无障碍</a></li>
+      <li><a href="#s12"><span>12</span>实施计划</a></li>
+      <li><a href="#s13"><span>13</span>验收标准</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <div class="cover">
+      <p class="kicker">UI / UX Proposal · Forum Redesign</p>
+      <h1>把论坛从「产品落地页」<br />改回「一块黑板和一屋子人」</h1>
+      <p class="lede">现在的论坛页看起来像一份精致的 Demo：渐变大标题、毛玻璃卡片、光晕、扫光按钮。它什么都好，就是不像有人在里面说话。这一版方案做减法，把信息密度和人的痕迹加回去。</p>
+      <div class="meta-row">
+        <div>范围<b>列表页 / 详情页 / 发帖</b></div>
+        <div>风格<b>极简 · 内容优先</b></div>
+        <div>参考<b>V2EX · Discourse · 豆瓣小组</b></div>
+        <div>日期<b>2026-11-18</b></div>
+      </div>
+    </div>
+
+    <!-- ================= 01 ================= -->
+    <section id="s1">
+      <span class="num">01</span>
+      <h2>诊断：AI 味从哪里来
+        <span class="sub">不是审美问题，是「装饰」压过了「内容」。以下每一条都能在 forum-board.tsx 里找到对应代码。</span>
+      </h2>
+
+      <div class="quote">
+        判断一个界面像不像 AI 做的，有个很简单的测试：<b>把界面上所有文字都换成乱码，它还能不能看？</b>如果还是一样好看，说明视觉本身在抢戏——那它就是装饰品，不是工具。
+      </div>
+
+      <h3>七个具体病灶</h3>
+      <table>
+        <thead><tr><th style="width:22%">现象</th><th style="width:38%">现在的实现</th><th>为什么读起来「假」</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>紫色渐变铺满全场</td>
+            <td><code>indigo-500 → violet → fuchsia</code> 同时用在标题渐变文字、分类激活态、头像底色、按钮阴影</td>
+            <td>这是 2024 年所有 AI 生成页面的默认色。一个颜色承担了六种语义，结果什么都没强调。</td>
+          </tr>
+          <tr>
+            <td>六色分类标签</td>
+            <td><code>CATEGORY_STYLE</code> 给六个分类各配一套 rose / sky / violet / emerald / indigo / amber</td>
+            <td>颜色数量超过人的识别上限。用户记住的是「一堆彩色药丸」，不是分类。</td>
+          </tr>
+          <tr>
+            <td>卡片套卡片</td>
+            <td>每条帖子 = <code>SpotlightCard</code> + 圆角 2xl + 悬浮光晕 + 入场模糊动画</td>
+            <td>论坛的核心动作是「扫读标题」。卡片把一屏能看 12 条压成了 3 条，还让每条都长得一样重。</td>
+          </tr>
+          <tr>
+            <td>营销口吻的头部</td>
+            <td>40px 渐变标题「活动、社团和互助，都发在这里」+ 圆形徽标「校园论坛」</td>
+            <td>这是落地页的第一屏，不是工具的入口。论坛不需要说服你来，它只需要让你看见里面在聊什么。</td>
+          </tr>
+          <tr>
+            <td>正文全文铺开</td>
+            <td>列表里直接渲染 <code>whitespace-pre-wrap</code> 的完整 body</td>
+            <td>没有摘要层级 = 没法扫读。一条长帖把整个列表撑开，后面的帖子全被推走。</td>
+          </tr>
+          <tr>
+            <td>装饰性动效</td>
+            <td><code>BlurText</code> / <code>GradientText</code> / <code>ShinyText</code> / spring layout 切换 / 逐条 0.05s 延迟入场</td>
+            <td>每次进页面都要等动画演完才能读。工具类界面里，动画是税，不是礼物。</td>
+          </tr>
+          <tr>
+            <td>没有时间感</td>
+            <td>时间统一格式化成 <code>11/18 10:00</code></td>
+            <td>人不会说「11/18 10:00」，人说「十分钟前」。少了这一层，帖子就没有「刚发生」的体温。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>还有一处结构性问题</h3>
+      <p>现在帖子详情是用 <code>?post=xxx</code> 在列表里原地展开的。这带来三个连锁问题：列表滚动位置丢失、无法分享到具体楼层、浏览器返回行为不符合直觉。论坛这种「点进去看、看完退出来」的场景，需要真正独立的路由。</p>
+
+      <div class="grid3">
+        <div class="note"><b>保留了不该保留的</b><br />视觉装饰、动效、渐变</div>
+        <div class="note"><b>砍掉了不该砍的</b><br />信息密度、时间感、讨论的余温</div>
+        <div class="note"><b>缺失的关键一环</b><br />「谁刚刚说了什么」——论坛的心跳</div>
+      </div>
+    </section>
+
+    <!-- ================= 02 ================= -->
+    <section id="s2">
+      <span class="num">02</span>
+      <h2>方向与参考坐标
+        <span class="sub">不追求「好看」，追求「耐看」和「一眼能读完」。</span>
+      </h2>
+
+      <p>一句话定位：<strong>像一份每天早上会被人翻开的校内小报，而不是一个要拉新的 App。</strong></p>
+
+      <h3>取谁的长处</h3>
+      <table>
+        <thead><tr><th style="width:20%">参考对象</th><th style="width:40%">取它的什么</th><th>不取它的什么</th></tr></thead>
+        <tbody>
+          <tr><td>V2EX</td><td>单列信息流、12–13px 的克制字号、几乎零装饰的列表、靠留白和分割线分层</td><td>过时的表格布局和纯链接感</td></tr>
+          <tr><td>Discourse</td><td>完整的论坛范式：分类、楼层、楼中楼、最后回复人、未读状态</td><td>功能面板过多带来的复杂度</td></tr>
+          <tr><td>豆瓣小组</td><td>中文社区的人文气：口语化标题、聊天的语气、话题而非条目</td><td>老旧的排版密度</td></tr>
+          <tr><td>Hacker News</td><td>极致的层级克制——整页只有一个色相，全靠字重和缩进排序</td><td>无视觉层次导致的疲劳</td></tr>
+          <tr><td>少数派 / 即刻</td><td>中文正文的排版质感：行高 1.75、字距微调、阅读宽度控制在 68 字符</td><td>品牌感过强的编辑风格</td></tr>
+        </tbody>
+      </table>
+
+      <h3>明确不做的事</h3>
+      <ul>
+        <li><strong>不做大图 banner。</strong>论坛首屏的价值是「看见七条正在发生的事」，不是「看见一张图」。</li>
+        <li><strong>不做深色科幻感。</strong>校园论坛的使用高峰是白天课间和晚上宿舍，暖白纸底最省眼睛。</li>
+        <li><strong>不做拟物和插画。</strong>所有视觉预算给排版和留白，插画一律不要。</li>
+      </ul>
+    </section>
+
+    <!-- ================= 03 ================= -->
+    <section id="s3">
+      <span class="num">03</span>
+      <h2>六条设计原则</h2>
+
+      <div class="rule">
+        <div class="rule__n">01</div>
+        <div>
+          <h4>内容即装饰</h4>
+          <p>页面上任何一个视觉元素，如果不能帮用户更快找到或读懂一条帖子，就删掉。留白、分割线、字号差，是唯一允许的装饰手段。</p>
+          <div class="do"><b>要：</b>用 1px 分割线 + 16px 行距给帖子分块</div>
+          <div class="dont"><b>不要：</b>用圆角卡片 + 投影 + 悬浮光晕给帖子分块</div>
+        </div>
+      </div>
+
+      <div class="rule">
+        <div class="rule__n">02</div>
+        <div>
+          <h4>一个主色，三个语义点</h4>
+          <p>整页只有一个强调色（墨绿），只出现在「当前分类下划线、主按钮、链接」。分类不用颜色区分，用中性标签 + 左侧语义小圆点。颜色一旦稀缺，指向性才成立。</p>
+          <div class="do"><b>要：</b>分类标签统一 <code>#F2EFE8</code> 底 + 深灰字</div>
+          <div class="dont"><b>不要：</b>六个分类六种饱和色</div>
+        </div>
+      </div>
+
+      <div class="rule">
+        <div class="rule__n">03</div>
+        <div>
+          <h4>密度优先于呼吸感</h4>
+          <p>一屏（900px 高）要能看到至少 7 条帖子。每条帖子三层信息：元信息 / 标题 / 摘要 + 脚注。把「空气」留给段间距，而不是卡片内边距。</p>
+          <div class="do"><b>要：</b>单条帖子高度 96–120px</div>
+          <div class="dont"><b>不要：</b>单条 180px 的卡片，一屏只放 3 条</div>
+        </div>
+      </div>
+
+      <div class="rule">
+        <div class="rule__n">04</div>
+        <div>
+          <h4>时间必须是人话</h4>
+          <p>所有时间显示相对值：刚刚 / 12 分钟前 / 昨天 21:40 / 11 月 14 日。悬停给绝对时间。列表脚注显示的不是发帖时间，而是「最后一条回复是谁、多久之前」——这是论坛的心跳。</p>
+          <div class="do"><b>要：</b>「3 条回复 · 林知夏 2 分钟前」</div>
+          <div class="dont"><b>不要：</b>「11/18 10:00 · 3 条评论」</div>
+        </div>
+      </div>
+
+      <div class="rule">
+        <div class="rule__n">05</div>
+        <div>
+          <h4>动效只允许 120ms 的颜色变化</h4>
+          <p>不许模糊入场、不许 spring 位移、不许逐条延迟。唯一保留的过渡是 hover 时文字变深、背景变浅。界面应该「已经在等你了」，而不是「正在为你表演」。</p>
+          <div class="do"><b>要：</b><code>transition: color .12s ease-out</code></div>
+          <div class="dont"><b>不要：</b><code>initial={{filter:"blur(6px)", y:16}}</code></div>
+        </div>
+      </div>
+
+      <div class="rule">
+        <div class="rule__n">06</div>
+        <div>
+          <h4>允许不完美</h4>
+          <p>真实社区里，标题会有口语、有错别字、有不规范的标点；有的帖子没人回，有的问题已经解决。界面要能容纳这些状态，而不是把一切修整成样板间。</p>
+          <div class="do"><b>要：</b>「还没有人回复，也许你能帮上忙。」</div>
+          <div class="dont"><b>不要：</b>「暂无数据」</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 04 ================= -->
+    <section id="s4">
+      <span class="num">04</span>
+      <h2>视觉语言
+        <span class="sub">全部以 CSS 变量的形式给出，实现时直接落到 <code>.forum-root</code> 作用域，不影响对话页现有主题。</span>
+      </h2>
+
+      <h3>色彩</h3>
+      <p>底不用纯白，用带一点点暖黄的纸白（<code>#FBFAF7</code>）。纯白在长时间阅读时会发刺，暖白更像纸。文字不用纯黑，用 <code>#1A1917</code>，避免生硬。</p>
+
+      <div class="sw">
+        <div class="sw__i"><div class="sw__c" style="background:#FBFAF7"></div><div class="sw__t"><b>纸底</b>#FBFAF7</div></div>
+        <div class="sw__i"><div class="sw__c" style="background:#FFFFFF"></div><div class="sw__t"><b>输入/浮层</b>#FFFFFF</div></div>
+        <div class="sw__i"><div class="sw__c" style="background:#1A1917"></div><div class="sw__t"><b>正文墨色</b>#1A1917</div></div>
+        <div class="sw__i"><div class="sw__c" style="background:#4F4B45"></div><div class="sw__t"><b>次级文字</b>#4F4B45</div></div>
+        <div class="sw__i"><div class="sw__c" style="background:#75706A"></div><div class="sw__t"><b>元信息</b>#75706A</div></div>
+        <div class="sw__i"><div class="sw__c" style="background:#E6E1D8"></div><div class="sw__t"><b>分割线</b>#E6E1D8</div></div>
+        <div class="sw__i"><div class="sw__c" style="background:#2E5D4E"></div><div class="sw__t"><b>强调色 墨绿</b>#2E5D4E</div></div>
+        <div class="sw__i"><div class="sw__c" style="background:#B4552D"></div><div class="sw__t"><b>语义 赭红</b>#B4552D</div></div>
+      </div>
+
+      <table class="compact">
+        <thead><tr><th style="width:26%">变量</th><th style="width:22%">值</th><th>用量与边界</th></tr></thead>
+        <tbody>
+          <tr><td><code>--paper</code></td><td>#FBFAF7</td><td>整页底。占比 ~90%</td></tr>
+          <tr><td><code>--surface</code></td><td>#FFFFFF</td><td>输入框、弹层、信息条。占比 ~5%</td></tr>
+          <tr><td><code>--ink</code></td><td>#1A1917</td><td>标题、正文主色</td></tr>
+          <tr><td><code>--ink-2</code></td><td>#4F4B45</td><td>摘要、评论正文。对比度 ≈ 8.9:1</td></tr>
+          <tr><td><code>--ink-3</code></td><td>#75706A</td><td>时间、作者、计数。对比度 ≈ 4.9:1（12px 仍达标）</td></tr>
+          <tr><td><code>--line</code></td><td>#E6E1D8</td><td>1px 分割线，唯一的分层手段</td></tr>
+          <tr><td><code>--accent</code></td><td>#2E5D4E</td><td><strong>只允许三处</strong>：当前分类下划线、主按钮、链接 hover。全页占比 &lt; 4%</td></tr>
+          <tr><td><code>--warn</code></td><td>#B4552D</td><td>只用于「寻找中 / 未解决」5px 圆点</td></tr>
+        </tbody>
+      </table>
+
+      <div class="warn"><b>硬性约束：</b>除以上色值外，不再引入任何新色。尤其是紫色的任何分支（indigo / violet / fuchsia）——这一版全部禁用。</div>
+
+      <h3>字体层级</h3>
+      <p>系统字体栈（PingFang SC / HarmonyOS Sans / 思源黑体），不加载 webfont。数字统一 <code>font-variant-numeric: tabular-nums</code>，让时间、计数、楼层号在纵向上对齐。</p>
+
+      <div class="scale">
+        <div class="scale__row"><div class="scale__k">页面标题<br />22 / 1.4 / 600</div><div style="font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.01em;">校园论坛</div></div>
+        <div class="scale__row"><div class="scale__k">详情页标题<br />22 / 1.45 / 600</div><div style="font-size:22px;font-weight:600;line-height:1.45;letter-spacing:-.01em;">图书馆四楼靠窗那排插座又坏了两个</div></div>
+        <div class="scale__row"><div class="scale__k">列表标题<br />15.5 / 1.5 / 500</div><div style="font-size:15.5px;font-weight:500;line-height:1.5;">周五晚七点，二教 301 一起看《海街日记》</div></div>
+        <div class="scale__row"><div class="scale__k">摘要<br />13.5 / 1.7 / 400</div><div style="font-size:13.5px;line-height:1.7;color:#4F4B45;">电影社的放映，免费，带个杯子就行，我们会煮热可可。大概放到九点半。</div></div>
+        <div class="scale__row"><div class="scale__k">详情正文<br />14.5 / 1.85 / 400</div><div style="font-size:14.5px;line-height:1.85;color:#4F4B45;max-width:34em;">就是靠东边第三、第四个位置，插上去没反应。已经报修过一次了，想问下有没有别的能充电的位置。</div></div>
+        <div class="scale__row"><div class="scale__k">元信息<br />12 / 1.4 / 400</div><div style="font-size:12px;color:#75706A;">林知夏 · 3 条回复 · 2 分钟前</div></div>
+      </div>
+
+      <p style="margin-top:18px;">详情页正文阅读宽度硬性限制在 <strong>68 个字符（约 34em）</strong>。超过这个宽度的中文段落，眼睛回行会丢字。</p>
+
+      <h3>形状、边框与阴影</h3>
+      <table class="compact">
+        <thead><tr><th style="width:22%">属性</th><th style="width:26%">取值</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>圆角</td><td>4 / 6 / 8 / 10</td><td>标签 4、输入框与按钮 6、面板 8、弹层 10。<strong>禁止 16px 以上大圆角</strong></td></tr>
+          <tr><td>边框</td><td>1px <code>--line</code></td><td>所有分层的唯一手段</td></tr>
+          <tr><td>阴影</td><td>仅浮层</td><td><code>0 8px 24px -12px rgba(0,0,0,.12)</code>。列表、卡片、按钮一律无阴影</td></tr>
+          <tr><td>毛玻璃</td><td>禁用</td><td><code>backdrop-filter</code> 与半透明卡片全部移除</td></tr>
+          <tr><td>图标</td><td>lucide · 16px · stroke 1.5</td><td><strong>颜色继承当前文字色</strong>，不做任何单独上色</td></tr>
+        </tbody>
+      </table>
+
+      <h3>间距</h3>
+      <p>4pt 基准：<code>4 / 8 / 12 / 16 / 20 / 24 / 32 / 48</code>。列表条目上下内边距 16px，条目之间靠 1px 线分隔，不额外加 margin。主栏与侧栏间距 0（用分割线），侧栏内边距 22px。</p>
+    </section>
+
+    <!-- ================= 05 ================= -->
+    <section id="s5">
+      <span class="num">05</span>
+      <h2>信息架构
+        <span class="sub">两块屏：一屏看有谁在说话，一屏看这句话说完了没有。</span>
+      </h2>
+
+      <h3>路由调整</h3>
+      <table class="compact">
+        <thead><tr><th style="width:30%">路由</th><th style="width:26%">对应</th><th>变更</th></tr></thead>
+        <tbody>
+          <tr><td><code>/forum</code></td><td>帖子列表</td><td>保留，重做视觉；支持 <code>?c=求助</code> 深链到分类</td></tr>
+          <tr><td><code>/forum/[id]</code></td><td>帖子详情</td><td><strong>新增。</strong>替代原来的 <code>?post=</code></td></tr>
+          <tr><td><code>/forum/new</code></td><td>发帖（可选）</td><td>首版用弹层；若后续要支持富文本与图片，再升级为独立页</td></tr>
+          <tr><td><code>/forum?post=xxx</code></td><td>旧链接</td><td>服务端 301 到 <code>/forum/[id]</code>，不破坏已分享的链接</td></tr>
+        </tbody>
+      </table>
+
+      <h3>列表页骨架</h3>
+      <pre style="font-family:var(--mono);font-size:12px;line-height:1.9;color:#4F4B45;background:#F5F2EC;border:1px solid var(--line);border-radius:8px;padding:16px 18px;overflow:auto;margin:14px 0;">┌──────────────────────────────────────────────────────────────┐
+│ 校园论坛 · 渝林       全部  活动  讲座  社团  招领  求助  闲置  [搜索] [发帖] │  ← 48px 工具条
+├────────────────────────────────────────────┬─────────────────┤
+│ 标题区  校园论坛              今天 14 条新帖  │  本周热议        │
+│         有人在问，也有人在答。              │  1 …            │
+├────────────────────────────────────────────┤  2 …            │
+│ 分类标签行  全部 8 · 活动 3 · 求助 2 …      │  …              │
+├────────────────────────────────────────────┤                 │
+│ 帖子行 1                                    │  最近回复        │
+│ 帖子行 2                                    │  …              │
+│ 帖子行 3                                    │                 │
+│ …                                           │  校园公告        │
+│                                             │  …              │
+│ [加载更多 / 分页]                            │  当前 37 人在逛   │
+└────────────────────────────────────────────┴─────────────────┘</pre>
+
+      <p>主栏宽度上限 <strong>720px</strong>，侧栏 <strong>236px</strong>，整体容器 1000px 居中。桌面端主栏与侧栏之间只有一条 1px 竖线——不加背景色差，不加卡片。</p>
+
+      <h3>详情页骨架</h3>
+      <pre style="font-family:var(--mono);font-size:12px;line-height:1.9;color:#4F4B45;background:#F5F2EC;border:1px solid var(--line);border-radius:8px;padding:16px 18px;overflow:auto;margin:14px 0;">论坛 / 求助 / No.0128
+──────────────────────────────────────────────
+图书馆四楼靠窗那排插座又坏了两个
+[头像] 陈屿  2025 级 · 图书馆四楼 · 8 分钟前      楼层 #1
+──────────────────────────────────────────────
+正文（阅读宽度 68 字符）
+┌───────────────────────────────┐
+│ 地点   图书馆四楼              │  ← 结构化信息条，只有有值时才出现
+│ 报修   已报修一次 · 11/16      │
+└───────────────────────────────┘
+回复  ·  收藏  ·  分享              [文字按钮，非药丸]
+
+3 条回复
+──────────────────────────────────────────────
+[头像] 林知夏  #2 · 2 分钟前
+三楼东侧那排是好的，我刚坐过。
+  └ [头像] 陈屿  #3 · 1 分钟前
+    谢谢，我先去三楼。
+└───────────────────────────────┘
+[ 写点什么… ]                        [发送]</pre>
+    </section>
+
+    <!-- ================= 06 ================= -->
+    <section id="s6">
+      <span class="num">06</span>
+      <h2>页面预览
+        <span class="sub">下面是用真实内容做的静态稿，可以直接对着看比例和信息密度。</span>
+      </h2>
+
+      <div class="frame">
+        <div class="frame__bar">
+          <div class="frame__dots"><i></i><i></i><i></i></div>
+          <div class="frame__url">youlin.app/forum</div>
+        </div>
+        <div class="mk">
+          <div class="mk__top">
+            <div class="mk__logo">校园论坛<em>渝林</em></div>
+            <div class="mk__nav">
+              <span class="on">全部</span><span>活动</span><span>讲座</span><span>社团</span><span>招领</span><span>求助</span><span>闲置</span>
+            </div>
+            <div class="mk__right">
+              <div class="mk__search">搜索帖子、地点</div>
+              <div class="mk__btn">发帖</div>
+            </div>
+          </div>
+
+          <div class="mk__body">
+            <div class="mk__main">
+              <div class="mk__title">
+                <h3>校园论坛</h3>
+                <span>今天 14 条新帖 · 37 人在逛</span>
+              </div>
+              <p class="mk__hint">有人在问，也有人在答。</p>
+
+              <article class="post">
+                <div class="post__meta">
+                  <span class="cat"><i class="dot" style="background:#B4552D"></i>求助</span>
+                  <span>图书馆四楼</span>
+                  <span>·</span>
+                  <span>8 分钟前</span>
+                </div>
+                <div class="post__h">图书馆四楼靠窗那排插座又坏了两个</div>
+                <p class="post__p">就是靠东边第三、第四个位置，插上去没反应。已经报修过一次了，想问下有没有别的能充电的位置，下午要连着上三节课。</p>
+                <div class="post__foot">
+                  <span class="ava" style="background:#8A6A4F">陈</span>
+                  <span>陈屿</span>
+                  <span>·</span>
+                  <span>3 条回复 · 林知夏 2 分钟前</span>
+                </div>
+              </article>
+
+              <article class="post">
+                <div class="post__meta">
+                  <span class="cat">招领</span>
+                  <span>二食堂</span>
+                  <span>·</span>
+                  <span>26 分钟前</span>
+                </div>
+                <div class="post__h">在二食堂捡到一张校园卡，姓 Y</div>
+                <p class="post__p">卡面有点磨了，背面贴了一张蓝色贴纸。放在二食堂一楼收餐台旁边的阿姨那里了，失主直接去拿就行。</p>
+                <div class="post__foot">
+                  <span class="ava" style="background:#5C6B57">周</span>
+                  <span>周迟</span>
+                  <span>·</span>
+                  <span>5 条回复 · 周迟 11 分钟前</span>
+                </div>
+              </article>
+
+              <article class="post">
+                <div class="post__meta">
+                  <span class="cat">活动</span>
+                  <span>周五 19:00 · 二教 301</span>
+                  <span>·</span>
+                  <span>1 小时前</span>
+                </div>
+                <div class="post__h">周五晚七点，二教 301 一起看《海街日记》</div>
+                <p class="post__p">电影社的放映，免费，带个杯子就行，我们会煮热可可。大概放到九点半，想留下来聊一会儿也可以。</p>
+                <div class="post__foot">
+                  <span class="ava" style="background:#6B5B7A">电</span>
+                  <span>电影社</span>
+                  <span>·</span>
+                  <span>12 条回复 · 苏晚 14 分钟前</span>
+                  <span class="post__chips"><span class="chip">已置顶</span></span>
+                </div>
+              </article>
+
+              <article class="post">
+                <div class="post__meta">
+                  <span class="cat">讲座</span>
+                  <span>报告厅</span>
+                  <span>·</span>
+                  <span>3 小时前</span>
+                </div>
+                <div class="post__h">关于「人工智能与写作」的那场讲座，值得去吗</div>
+                <p class="post__p">周四下午在报告厅，主讲是外校来的老师。有去过的同学说说吗，我主要想知道是不是又一场 PPT 念稿。</p>
+                <div class="post__foot">
+                  <span class="ava" style="background:#4F6270">何</span>
+                  <span>何一鸣</span>
+                  <span>·</span>
+                  <span>9 条回复 · 沈一 40 分钟前</span>
+                </div>
+              </article>
+
+              <article class="post">
+                <div class="post__meta">
+                  <span class="cat">闲置</span>
+                  <span>西区 6 栋</span>
+                  <span>·</span>
+                  <span>昨天 21:40</span>
+                </div>
+                <div class="post__h">出一台还能用的台灯，暖光，20 块</div>
+                <p class="post__p">换宿舍多出来的，灯泡是好的，就是底座有点划痕。西区 6 栋，自提，不送。</p>
+                <div class="post__foot">
+                  <span class="ava" style="background:#7A6A4F">江</span>
+                  <span>江野</span>
+                  <span>·</span>
+                  <span>2 条回复 · 江野 昨天 22:03</span>
+                </div>
+              </article>
+
+              <article class="post">
+                <div class="post__meta">
+                  <span class="cat">社团</span>
+                  <span>南门集合 · 周六 08:00</span>
+                  <span>·</span>
+                  <span>昨天 18:12</span>
+                </div>
+                <div class="post__h">摄影社这学期最后一次外拍，去老城区</div>
+                <p class="post__p">周六早上八点南门集合，坐 37 路。相机自带，手机也行，我们不看器材，只看你有没有想拍的东西。</p>
+                <div class="post__foot">
+                  <span class="ava" style="background:#5F5A6B">摄</span>
+                  <span>摄影社</span>
+                  <span>·</span>
+                  <span>21 条回复 · 吴念 昨天 23:11</span>
+                </div>
+              </article>
+
+              <article class="post">
+                <div class="post__meta">
+                  <span class="cat cat--done"><i class="dot" style="background:#2E5D4E"></i>求助 · 已解决</span>
+                  <span>·</span>
+                  <span>前天 14:05</span>
+                </div>
+                <div class="post__h">选课系统是不是又崩了</div>
+                <p class="post__p">打开一直是白屏，换了两个浏览器都一样。刚在群里看到有人说要等到下午三点。</p>
+                <div class="post__foot">
+                  <span class="ava" style="background:#4F6A6A">吴</span>
+                  <span>吴念</span>
+                  <span>·</span>
+                  <span>16 条回复 · 何一鸣 前天 15:42</span>
+                </div>
+              </article>
+
+              <article class="post" style="border-bottom:0;">
+                <div class="post__meta">
+                  <span class="cat">招领</span>
+                  <span>三教 402</span>
+                  <span>·</span>
+                  <span>3 天前</span>
+                </div>
+                <div class="post__h">三教 402 有人落了一把黑色雨伞</div>
+                <p class="post__p">长柄的，伞骨有一根歪了。我放在 402 讲台底下了，应该还在。</p>
+                <div class="post__foot">
+                  <span class="ava" style="background:#6A5F57">沈</span>
+                  <span>沈一</span>
+                  <span>·</span>
+                  <span style="color:#A8A29A;">还没有人回复，也许你能帮上忙</span>
+                </div>
+              </article>
+            </div>
+
+            <aside class="mk__aside">
+              <p class="side-h">本周热议</p>
+              <ul class="hot">
+                <li><i>1</i><span>期末周图书馆到底几点开门</span></li>
+                <li><i>2</i><span>有人在南门附近见过一只橘猫吗</span></li>
+                <li><i>3</i><span>关于宿舍熄灯时间调整的传闻</span></li>
+                <li><i>4</i><span>求一个能长期一起自习的人</span></li>
+                <li><i>5</i><span>校医院牙科到底要不要提前预约</span></li>
+              </ul>
+
+              <p class="side-h">最近回复</p>
+              <div class="side-li"><b>林知夏</b> 在「图书馆四楼靠窗…」里说 <span>三楼那排是好的</span></div>
+              <div class="side-li"><b>苏晚</b> 在「一起看《海街日记》」里说 <span>热可可还有吗</span></div>
+              <div class="side-li"><b>沈一</b> 回复了「选课系统是不是又崩了」</div>
+
+              <p class="side-h" style="margin-top:22px;">校园公告</p>
+              <div class="side-li">论坛上线「闲置」分类，交易请尽量校内面交<br /><span>11/12</span></div>
+              <div class="side-li" style="border-bottom:0;">关于匿名发帖的几点说明<br /><span>11/03</span></div>
+
+              <p class="side-note">论坛由学生技术组维护<br />现在有 37 人在逛 · 今日 14 条新帖</p>
+            </aside>
+          </div>
+        </div>
+      </div>
+      <p class="cap">↑ 列表页。一屏可见 8 条帖子，全部信息靠字号、字重、留白和 1px 线分层，没有任何卡片与阴影。</p>
+
+      <h3>详情页</h3>
+      <div class="frame">
+        <div class="frame__bar">
+          <div class="frame__dots"><i></i><i></i><i></i></div>
+          <div class="frame__url">youlin.app/forum/7f3a…/128</div>
+        </div>
+        <div class="mk2">
+          <div class="crumb">论坛 / 求助 / No.0128</div>
+          <h3>图书馆四楼靠窗那排插座又坏了两个</h3>
+          <div class="byline">
+            <span class="ava" style="background:#8A6A4F;width:22px;height:22px;font-size:11px;">陈</span>
+            <b>陈屿</b>
+            <span>2025 级</span>
+            <span>·</span>
+            <span>8 分钟前</span>
+            <span style="margin-left:auto;">#1</span>
+          </div>
+          <p>就是靠东边第三、第四个位置，插上去没反应。已经报修过一次了，11 月 16 号在后勤平台上提交的，工单还在「已受理」。</p>
+          <p>想问下有没有别的能充电的位置，下午连着三节课，电脑撑不到晚上。</p>
+          <div class="attrs">
+            <div><span>地点</span>图书馆四楼</div>
+            <div><span>报修</span>11/16 · 已受理</div>
+            <div><span>状态</span>寻找中</div>
+          </div>
+
+          <div style="font-size:12px;color:#75706A;margin:22px 0 4px;">3 条回复</div>
+
+          <div class="cmt">
+            <div class="cmt__h"><span class="ava" style="background:#5C6B57">林</span><b>林知夏</b><span>·</span><span>2 分钟前</span><span style="margin-left:auto;">#2</span></div>
+            <p class="cmt__b">三楼东侧那排是好的，我刚坐过，靠窗第一个位置。</p>
+          </div>
+
+          <div class="cmt" style="padding:0;border-top:0;">
+            <div class="cmt cmt--nest">
+              <div class="cmt__h"><span class="ava" style="background:#8A6A4F">陈</span><b>陈屿</b><span>·</span><span>1 分钟前</span><span style="margin-left:auto;">#3</span></div>
+              <p class="cmt__quote">林知夏：三楼东侧那排是好的</p>
+              <p class="cmt__b">谢谢，我先去三楼。</p>
+            </div>
+          </div>
+
+          <div class="cmt">
+            <div class="cmt__h"><span class="ava" style="background:#7A6A4F">周</span><b>周迟</b><span>·</span><span>刚刚</span><span style="margin-left:auto;">#4</span></div>
+            <p class="cmt__b">四楼那几个好像上学期就坏了，报修过两次都没人来。</p>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:18px;align-items:center;">
+            <div style="flex:1;border:1px solid #E6E1D8;border-radius:6px;padding:9px 12px;font-size:13px;color:#A8A29A;background:#fff;">写点什么…</div>
+            <div class="mk__btn" style="padding:9px 16px;">发送</div>
+          </div>
+        </div>
+      </div>
+      <p class="cap">↑ 详情页。楼层号、楼中楼引用、结构化信息条、未解决状态——这些是「论坛感」的来源，比任何渐变都有效。</p>
+    </section>
+
+    <!-- ================= 07 ================= -->
+    <section id="s7">
+      <span class="num">07</span>
+      <h2>组件规格
+        <span class="sub">九个组件覆盖全部页面，均不含装饰状态。</span>
+      </h2>
+
+      <table>
+        <thead><tr><th style="width:18%">组件</th><th style="width:34%">结构</th><th style="width:26%">尺寸 / 状态</th><th>备注</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>ForumTopBar</td>
+            <td>品牌名 · 分类导航 · 搜索 · 发帖按钮</td>
+            <td>高 48px，sticky；当前项 2px 下划线 accent</td>
+            <td>移动端折叠：品牌 + 搜索图标 + 发帖</td>
+          </tr>
+          <tr>
+            <td>CategoryTabs</td>
+            <td>横向滚动文字标签 + 计数</td>
+            <td>13px / 400 → 选中 500 + 下划线</td>
+            <td>不用 pill、不用背景色块</td>
+          </tr>
+          <tr>
+            <td>PostRow</td>
+            <td>MetaLine / 标题 / 摘要 2 行 / Footer</td>
+            <td>padding 16px 0；高 96–120px</td>
+            <td>hover：标题变 accent，整行底色 #F7F4EE</td>
+          </tr>
+          <tr>
+            <td>MetaLine</td>
+            <td>分类标签 · 地点/时间 · 相对时间</td>
+            <td>12px，gap 8px，分隔符「·」</td>
+            <td>分隔符用字符而非边框</td>
+          </tr>
+          <tr>
+            <td>CategoryTag</td>
+            <td>5px 语义点 + 文字</td>
+            <td>11.5px，padding 2px 6px，radius 4</td>
+            <td>三种形态：普通（中性灰）/ 待解决（赭底）/ 已解决（绿底）</td>
+          </tr>
+          <tr>
+            <td>Avatar</td>
+            <td>首字 + 稳定底色</td>
+            <td>列表 17px / 详情 22px / 评论 20px</td>
+            <td><strong>颜色由 userId 哈希从 8 个低饱和大地色中取</strong>，同一用户永远同色</td>
+          </tr>
+          <tr>
+            <td>Composer</td>
+            <td>分类选择 / 标题 / 正文 / 地点时间（折叠）/ 发布</td>
+            <td>桌面弹层 600px；移动端全屏</td>
+            <td>「地点」「时间」默认收起，点「加一点细节」展开</td>
+          </tr>
+          <tr>
+            <td>CommentItem</td>
+            <td>头像 / 名字 / 楼层 / 时间 / 正文 / 回复</td>
+            <td>padding 16px 0；二级缩进 14px + 1px 竖线</td>
+            <td>「回复」按钮 hover 才出现，降低视觉噪音</td>
+          </tr>
+          <tr>
+            <td>EmptyState</td>
+            <td>一句人话 + 一个动作</td>
+            <td>垂直居中，padding 64px 0</td>
+            <td>无插图、无图标</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>头像配色（8 色，低饱和大地色系）</h4>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px;">
+        <span style="width:32px;height:32px;border-radius:50%;background:#8A6A4F;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">陈</span>
+        <span style="width:32px;height:32px;border-radius:50%;background:#5C6B57;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">林</span>
+        <span style="width:32px;height:32px;border-radius:50%;background:#6B5B7A;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">苏</span>
+        <span style="width:32px;height:32px;border-radius:50%;background:#4F6270;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">何</span>
+        <span style="width:32px;height:32px;border-radius:50%;background:#7A6A4F;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">江</span>
+        <span style="width:32px;height:32px;border-radius:50%;background:#4F6A6A;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">吴</span>
+        <span style="width:32px;height:32px;border-radius:50%;background:#6A5F57;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">沈</span>
+        <span style="width:32px;height:32px;border-radius:50%;background:#74564E;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;">周</span>
+      </div>
+      <p style="font-size:12.5px;color:var(--ink-3);">不用随机色、不用渐变色。同一人在列表、详情、评论里必须同色——这是「人」的感觉，比十二色的彩虹头像强得多。</p>
+    </section>
+
+    <!-- ================= 08 ================= -->
+    <section id="s8">
+      <span class="num">08</span>
+      <h2>内容策略：人文痕迹是设计出来的
+        <span class="sub">「AI 味」有一半不在视觉上，在文案上。空壳界面的假热情，比渐变更伤人。</span>
+      </h2>
+
+      <h3>十二个具体手法</h3>
+      <table class="compact">
+        <thead><tr><th style="width:6%">#</th><th style="width:24%">手法</th><th style="width:32%">不要</th><th>要</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>相对时间 + 绝对时间 hover</td><td>11/18 10:00</td><td>8 分钟前 → 悬停显示 2026-11-18 09:52</td></tr>
+          <tr><td>2</td><td>显示最后回复而非仅发帖时间</td><td>3 条评论</td><td>3 条回复 · 林知夏 2 分钟前</td></tr>
+          <tr><td>3</td><td>身份用文字小字</td><td>「活跃用户」金色徽章</td><td>2025 级 · 图书馆四楼</td></tr>
+          <tr><td>4</td><td>楼层号与帖子编号</td><td>无</td><td>#1 #2 #3 · No.0128</td></tr>
+          <tr><td>5</td><td>真实计数</td><td>「加入我们」</td><td>今天 14 条新帖 · 37 人在逛</td></tr>
+          <tr><td>6</td><td>分类给一句人写的话</td><td>「求助分类」</td><td>「问一句不丢人，答一句也不费事。」</td></tr>
+          <tr><td>7</td><td>空状态说人话</td><td>暂无数据</td><td>「这一栏还空着，等第一个开口的人。」</td></tr>
+          <tr><td>8</td><td>无人回复的帖子保留并提示</td><td>折叠隐藏</td><td>「还没有人回复，也许你能帮上忙。」</td></tr>
+          <tr><td>9</td><td>页脚落款</td><td>© 2026 All Rights Reserved</td><td>论坛由学生技术组维护 · 最后更新 11/18 09:42</td></tr>
+          <tr><td>10</td><td>允许口语化标题</td><td>「关于讲座报名的通知」</td><td>「周四那个讲座，值得去吗」</td></tr>
+          <tr><td>11</td><td>错误态带出路</td><td>加载失败</td><td>「没拉到帖子，可能是网的问题。刷新一下试试。」</td></tr>
+          <tr><td>12</td><td>不用 emoji 做装饰</td><td>🎉 欢迎来到论坛 🎉</td><td>纯文字；用户内容里的 emoji 原样保留</td></tr>
+        </tbody>
+      </table>
+
+      <h3>列表页标题区文案</h3>
+      <p>现在是一句 40px 的 slogan。改成一个页面标题 + 一行实时状态：</p>
+      <div class="note" style="padding:20px 22px;">
+        <div style="font-size:22px;font-weight:600;letter-spacing:-.01em;">校园论坛</div>
+        <div style="font-size:12.5px;color:#75706A;margin-top:2px;">今天 14 条新帖 · 37 人在逛</div>
+        <div style="font-size:13.5px;color:#4F4B45;margin-top:10px;">有人在问，也有人在答。</div>
+      </div>
+      <p>最后一句是可选的一行「编辑手记」，每周换一次。它的作用不是解释功能，而是让页面看起来有人打理过。</p>
+
+      <h3>分类说明文案</h3>
+      <table class="compact">
+        <thead><tr><th style="width:14%">分类</th><th>一句说明（显示在分类页顶部，12.5px 灰字）</th></tr></thead>
+        <tbody>
+          <tr><td>活动</td><td>要去的事都写在这里，写清时间地点，别人好安排。</td></tr>
+          <tr><td>讲座</td><td>值得听的，和听完想吐槽的。</td></tr>
+          <tr><td>社团</td><td>招新、排练、约饭，都可以发。</td></tr>
+          <tr><td>招领</td><td>捡到东西放这里，丢东西也放这里。</td></tr>
+          <tr><td>求助</td><td>问一句不丢人，答一句也不费事。</td></tr>
+          <tr><td>闲置</td><td>校内面交，不邮寄，别转账。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>种子内容建议</h3>
+      <p>现在数据库里的种子是 5 条公告式文案（「整理共享单车和捡拾操场垃圾，预计一小时」），像通知，不像人说的话。建议替换为 15–20 条带具体细节的帖子，覆盖全部六个分类，每条至少有一个可验证的具体物：门牌号、时间段、价格、天气、某个人的名字。</p>
+      <div class="badge-list">
+        <span>「三教 402 讲台下面」</span>
+        <span>「20 块，不送」</span>
+        <span>「九点半散场」</span>
+        <span>「靠窗第一个位置」</span>
+        <span>「37 路」</span>
+        <span>「工单还在已受理」</span>
+      </div>
+      <p>细节是可信度的来源。没有细节的内容，读者会自动判定为「填充物」。</p>
+    </section>
+
+    <!-- ================= 09 ================= -->
+    <section id="s9">
+      <span class="num">09</span>
+      <h2>状态与边界
+        <span class="sub">每个状态都必须被设计，且都必须说人话。</span>
+      </h2>
+
+      <table>
+        <thead><tr><th style="width:16%">状态</th><th style="width:40%">呈现</th><th>文案</th></tr></thead>
+        <tbody>
+          <tr><td>首屏加载</td><td>3 条骨架行，只有 1px 线 + 两条灰条，无脉冲动画</td><td>—</td></tr>
+          <tr><td>列表为空</td><td>居中，一行灰字</td><td>这一栏还空着，等第一个开口的人。</td></tr>
+          <tr><td>搜索无结果</td><td>灰字 + 「看看全部」文字链接</td><td>没找到「{query}」，换个说法试试。</td></tr>
+          <tr><td>加载失败</td><td>灰字 + 「重新加载」文字链接</td><td>没拉到帖子，可能是网的问题。刷新一下试试。</td></tr>
+          <tr><td>帖子不存在</td><td>灰字 + 返回列表</td><td>这条帖子不在了，或者链接不对。</td></tr>
+          <tr><td>未登录发帖</td><td>弹层内提示，不跳页</td><td>得先登录才能发帖。登录后写的内容不会丢。</td></tr>
+          <tr><td>敏感信息被隐藏</td><td>行内轻提示，不弹 toast</td><td>手机号已自动隐去，需要的话可以在回复里私聊。</td></tr>
+          <tr><td>自己的帖子</td><td>操作区出现「编辑」「删除」，非自己的不出现</td><td>删除需二次确认，说明「删除后不能恢复」</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note"><b>关于 toast：</b>现在大量使用 <code>toast.success/error</code>。建议只在「动作已发生且页面未更新」时使用（如删除、标记已解决）；表单校验、搜索无结果这类情况，直接写在字段下方或列表位置，不要再浮一层。</div>
+    </section>
+
+    <!-- ================= 10 ================= -->
+    <section id="s10">
+      <span class="num">10</span>
+      <h2>反 AI 味清单
+        <span class="sub">可以直接贴进 code review checklist。出现任意一条，打回。</span>
+      </h2>
+
+      <div class="grid2">
+        <div>
+          <h4 style="color:var(--warn);">禁止</h4>
+          <ul>
+            <li><code>bg-gradient-to-*</code> 的任何使用（含文字渐变）</li>
+            <li>indigo / violet / fuchsia / purple 色系</li>
+            <li><code>backdrop-blur</code>、<code>.glass</code>、半透明卡片</li>
+            <li><code>SpotlightCard</code>、光晕 <code>shadow-[0_0_...]</code></li>
+            <li><code>BlurText</code> / <code>GradientText</code> / <code>ShinyText</code></li>
+            <li>framer-motion 的 <code>layout</code>、<code>AnimatePresence</code> 入场</li>
+            <li>圆角 ≥ 16px（<code>rounded-2xl</code> / <code>3xl</code>）</li>
+            <li>图标单独上色（<code>text-violet-600</code> 之类）</li>
+            <li>装饰性 emoji</li>
+            <li>六色分类标签</li>
+            <li>列表内展开详情</li>
+            <li>卡片悬浮阴影 + translateY 位移</li>
+          </ul>
+        </div>
+        <div>
+          <h4 style="color:var(--accent);">要求</h4>
+          <ul>
+            <li>全页色彩：1 强调色 + 3 语义点 + 中性灰阶</li>
+            <li>分层只靠 1px 线与留白</li>
+            <li>圆角 4 / 6 / 8 / 10</li>
+            <li>过渡 <code>120ms ease-out</code>，只改颜色和背景</li>
+            <li>图标 16px，颜色 <code>currentColor</code></li>
+            <li>所有时间相对显示</li>
+            <li>列表摘要 2 行截断（<code>-webkit-line-clamp: 2</code>）</li>
+            <li>详情独立路由 <code>/forum/[id]</code></li>
+            <li>数字 <code>tabular-nums</code></li>
+            <li>键盘可达 + 2px accent focus ring</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 11 ================= -->
+    <section id="s11">
+      <span class="num">11</span>
+      <h2>响应式与无障碍</h2>
+
+      <h3>断点</h3>
+      <table class="compact">
+        <thead><tr><th style="width:20%">宽度</th><th style="width:26%">布局</th><th>调整</th></tr></thead>
+        <tbody>
+          <tr><td>≥ 1024px</td><td>主栏 720 + 侧栏 236</td><td>完整形态</td></tr>
+          <tr><td>768–1023px</td><td>单栏 720 居中</td><td>侧栏内容折叠到列表顶部，只保留「本周热议」横向 3 条</td></tr>
+          <tr><td>&lt; 768px</td><td>单栏全宽，padding 16</td><td>分类 tab 横向滚动；工具条 48px 只留品牌 + 搜索 + 发帖；发帖弹层全屏</td></tr>
+          <tr><td>&lt; 400px</td><td>同上</td><td>摘要降到 1 行；脚注只保留「N 条回复」</td></tr>
+        </tbody>
+      </table>
+
+      <h3>无障碍</h3>
+      <ul>
+        <li>所有正文对比度 ≥ 4.5:1；<code>--ink-3</code>（#75706A）在纸底上为 4.9:1，12px 灰字仍达标。</li>
+        <li>分类 tab 使用 <code>role="tablist"</code> + 方向键切换；当前项 <code>aria-selected</code>。</li>
+        <li>帖子标题为唯一 <code>&lt;a&gt;</code>，整行可点用 <code>::after</code> 覆盖，不做 <code>onClick</code> 嵌套按钮。</li>
+        <li>焦点样式统一 <code>outline: 2px solid var(--accent); outline-offset: 2px</code>，禁止 <code>outline:none</code>。</li>
+        <li>评论列表用 <code>&lt;article&gt;</code> + <code>&lt;ol&gt;</code>，楼层号放 <code>aria-label</code>。</li>
+        <li>相对时间用 <code>&lt;time datetime&gt;</code>，屏幕阅读器读绝对值。</li>
+        <li>尊重 <code>prefers-reduced-motion</code>：虽然本方案几乎没有动效，仍需保留该查询。</li>
+        <li>触控目标 ≥ 40px（移动端「回复」按钮加透明扩边）。</li>
+      </ul>
+    </section>
+
+    <!-- ================= 12 ================= -->
+    <section id="s12">
+      <span class="num">12</span>
+      <h2>实施计划
+        <span class="sub">五步，每步都可独立上线。建议按顺序，前两步就能让页面脱胎换骨。</span>
+      </h2>
+
+      <div class="phase">
+        <div class="phase__k">STEP 1<br />0.5 天</div>
+        <div>
+          <h4>换皮：干掉装饰</h4>
+          <p>在 <code>globals.css</code> 新增 <code>.forum-root</code> 作用域变量；删除 forum-board 内全部 <code>SpotlightCard</code>、<code>BlurText</code>、<code>GradientText</code>、<code>ShinyText</code>、<code>.glass</code>、渐变与光晕；把六色 <code>CATEGORY_STYLE</code> 压成中性标签 + 语义点。仅此一步，AI 味能去掉七成。</p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase__k">STEP 2<br />1 天</div>
+        <div>
+          <h4>重排列表：三层信息 + 相对时间</h4>
+          <p>抽出 <code>PostRow</code>、<code>MetaLine</code>、<code>CategoryTag</code>、<code>Avatar</code>、<code>formatRelativeTime()</code>。摘要改为 2 行截断。条目改用 1px 分割线而非卡片。</p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase__k">STEP 3<br />1 天</div>
+        <div>
+          <h4>拆路由：详情页独立</h4>
+          <p>新增 <code>app/(chat)/forum/[id]/page.tsx</code>，实现楼层、楼中楼、结构化信息条、底部回复框；<code>?post=</code> 做 301 兼容。</p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase__k">STEP 4<br />0.5 天</div>
+        <div>
+          <h4>补侧栏与工具条</h4>
+          <p><code>ForumSidebar</code>（热议 / 最近回复 / 公告 / 在线数）、<code>ForumTopBar</code>（分类下划线导航）。需要接口补 <code>hotPosts</code> 字段或前端按评论数排序。</p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase__k">STEP 5<br />0.5 天</div>
+        <div>
+          <h4>发帖弹层 + 状态收尾</h4>
+          <p>发帖改为弹层（桌面 600px / 移动全屏），地点时间折叠；补全空态、错误态、骨架屏文案；替换种子内容。</p>
+        </div>
+      </div>
+
+      <h3>文件级改动</h3>
+      <table class="compact">
+        <thead><tr><th style="width:44%">文件</th><th>动作</th></tr></thead>
+        <tbody>
+          <tr><td><code>components/chat/forum-board.tsx</code></td><td>拆空，改为页面组装层（约 60 行）</td></tr>
+          <tr><td><code>components/forum/post-row.tsx</code></td><td>新增</td></tr>
+          <tr><td><code>components/forum/post-list.tsx</code></td><td>新增</td></tr>
+          <tr><td><code>components/forum/forum-top-bar.tsx</code></td><td>新增</td></tr>
+          <tr><td><code>components/forum/forum-sidebar.tsx</code></td><td>新增</td></tr>
+          <tr><td><code>components/forum/post-detail.tsx</code></td><td>新增</td></tr>
+          <tr><td><code>components/forum/comment-thread.tsx</code></td><td>新增</td></tr>
+          <tr><td><code>components/forum/composer-dialog.tsx</code></td><td>新增</td></tr>
+          <tr><td><code>components/forum/avatar.tsx</code></td><td>新增（含稳定色哈希）</td></tr>
+          <tr><td><code>lib/forum/format.ts</code></td><td>新增 <code>relativeTime</code> / <code>excerpt</code> / <code>avatarColor</code></td></tr>
+          <tr><td><code>app/(chat)/forum/[id]/page.tsx</code></td><td>新增路由</td></tr>
+          <tr><td><code>app/(chat)/api/forum/route.ts</code></td><td>列表补 <code>lastReplyAt</code> / <code>lastReplyAuthor</code> / <code>excerpt</code></td></tr>
+          <tr><td><code>app/globals.css</code></td><td>新增 <code>.forum-root</code> 变量块，不动全局主题</td></tr>
+          <tr><td><code>lib/campus/forum.ts</code></td><td>替换 5 条种子数据为 15–20 条真实感内容</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note"><b>接口提醒：</b>「最后回复人 + 时间」是列表脚注的核心，但当前 <code>ForumPost</code> 只有 <code>commentCount</code>。需要在 <code>countForumComments</code> 的同一处聚合 <code>max(createdAt)</code> 与对应 <code>author</code>，或在评论表加索引后单查。这是本方案唯一需要后端配合的点。</div>
+    </section>
+
+    <!-- ================= 13 ================= -->
+    <section id="s13">
+      <span class="num">13</span>
+      <h2>验收标准
+        <span class="sub">设计走查时逐条对照，全部通过才算完成。</span>
+      </h2>
+
+      <ul class="checklist">
+        <li>页面内不存在任何 <code>gradient</code>、<code>blur</code>、<code>backdrop-filter</code>、彩色投影。</li>
+        <li>全页只有 1 个强调色，且仅出现在分类下划线、主按钮、链接 hover 三处。</li>
+        <li>1440×900 视口下，列表首屏可见 ≥ 7 条帖子。</li>
+        <li>每条帖子高度在 96–120px 之间，摘要不超过 2 行。</li>
+        <li>所有时间均为相对格式，悬停可见绝对时间。</li>
+        <li>每个分类只有中性标签，语义状态只用一个 5px 圆点表达。</li>
+        <li>点击帖子进入独立路由，返回后列表滚动位置保留。</li>
+        <li>详情页正文行宽 ≤ 68 字符。</li>
+        <li>同一用户在所有位置头像颜色一致。</li>
+        <li>Tab 键可遍历分类、帖子标题、回复框；焦点环可见。</li>
+        <li>所有文字对比度 ≥ 4.5:1（用 DevTools 实测，不凭感觉）。</li>
+        <li>375px 宽度下无横向滚动，发帖弹层为全屏。</li>
+        <li>空态、错误态、无结果三种情况都有独立文案，且不出现「暂无数据」。</li>
+        <li>刷新页面时没有入场动画，内容立即可读。</li>
+      </ul>
+
+      <div class="quote" style="margin-top:32px;">
+        最后一条判断标准，适合贴在显示器上：<b>如果你把这一页截图发给一个从没见过这个产品的人，他会觉得「这是一个有人在用的论坛」，还是「这是一张设计稿」？</b>
+      </div>
+    </section>
+
+    <footer>
+      <span>论坛前端改造设计方案 · v1.0</span>
+      <span>2026-11-18 · 待评审</span>
+    </footer>
+
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>论坛要闻栏 · 设计方案 v1.0</title>
+<style>
+  :root {
+    --bg: oklch(0.985 0.006 280);
+    --fg: oklch(0.12 0 0);
+    --card: #ffffff;
+    --primary: oklch(0.5 0.2 285);
+    --border: oklch(0.9 0 0);
+    --muted: oklch(0.94 0 0);
+    --muted-fg: oklch(0.58 0 0);
+    --dot-sz: oklch(0.5 0.2 285);
+    --dot-rd: oklch(0.55 0.13 45);
+    --dot-kb: oklch(0.52 0.09 155);
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 56px 32px 120px; }
+  .wide { max-width: 1100px; }
+
+  /* ---------- 文档排印 ---------- */
+  h1 { font-size: 30px; line-height: 1.3; letter-spacing: -0.02em; margin: 0 0 10px; font-weight: 600; }
+  h2 {
+    font-size: 18px; line-height: 1.4; margin: 64px 0 18px; font-weight: 600;
+    letter-spacing: -0.01em; padding-top: 22px; border-top: 1px solid var(--border);
+  }
+  h2 .num {
+    display: inline-block; min-width: 30px; font-family: ui-monospace, "Cascadia Code", monospace;
+    font-size: 12px; color: var(--muted-fg); font-weight: 400; letter-spacing: 0;
+  }
+  h3 { font-size: 14px; margin: 30px 0 10px; font-weight: 600; letter-spacing: -0.005em; }
+  p { margin: 0 0 14px; color: oklch(0.28 0 0); }
+  .lead { font-size: 15px; color: oklch(0.3 0 0); }
+  .meta {
+    font-family: ui-monospace, "Cascadia Code", monospace; font-size: 11.5px;
+    color: var(--muted-fg); letter-spacing: 0.02em; margin-bottom: 34px;
+  }
+  .meta span + span::before { content: " · "; }
+  strong { font-weight: 600; color: var(--fg); }
+  code {
+    font-family: ui-monospace, "Cascadia Code", monospace; font-size: 12px;
+    background: var(--muted); padding: 1.5px 5px; border-radius: 3px; color: oklch(0.25 0 0);
+  }
+  ul, ol { margin: 0 0 16px; padding-left: 20px; }
+  li { margin-bottom: 7px; color: oklch(0.28 0 0); }
+  li::marker { color: var(--muted-fg); }
+
+  /* ---------- 结论卡 ---------- */
+  .verdict {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 22px 24px; margin: 28px 0 8px;
+  }
+  .verdict .tag {
+    font-size: 11px; letter-spacing: 0.1em; color: var(--muted-fg); margin-bottom: 10px;
+  }
+  .verdict p { margin: 0 0 8px; }
+  .verdict p:last-child { margin: 0; }
+
+  /* ---------- 表格 ---------- */
+  table { width: 100%; border-collapse: collapse; margin: 18px 0 22px; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 12px 9px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 11.5px; font-weight: 500; letter-spacing: 0.06em; color: var(--muted-fg); border-bottom: 1px solid oklch(0.82 0 0); }
+  td.num, th.num { text-align: right; font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; padding-right: 0; }
+  tr.bad td.num { color: oklch(0.52 0.16 25); }
+  tr.good td.num { color: oklch(0.45 0.12 155); }
+
+  /* ---------- 浏览器画框（静态稿） ---------- */
+  .frame {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; margin: 22px 0 10px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03), 0 12px 32px -24px rgba(0,0,0,0.22);
+  }
+  .frame-bar {
+    display: flex; align-items: center; gap: 6px; padding: 9px 12px;
+    border-bottom: 1px solid var(--border); background: oklch(0.975 0 0);
+  }
+  .frame-bar i { width: 8px; height: 8px; border-radius: 50%; background: oklch(0.87 0 0); display: block; }
+  .frame-bar .url {
+    margin-left: 8px; font-family: ui-monospace, monospace; font-size: 10.5px;
+    color: var(--muted-fg);
+  }
+  .frame-body { background: var(--bg); }
+  .cap { font-size: 11.5px; color: var(--muted-fg); margin: 0 0 30px; line-height: 1.6; }
+
+  /* ---------- 论坛页面模拟 ---------- */
+  .sim { padding: 0; }
+  .sim-topbar {
+    display: flex; align-items: center; gap: 14px; height: 48px; padding: 0 32px;
+    border-bottom: 1px solid var(--border); background: var(--bg);
+  }
+  .sim-brand { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .sim-brand s { text-decoration: none; font-size: 12px; font-weight: 400; color: oklch(0.55 0 0); margin-left: 6px; }
+  .sim-tabs { display: flex; gap: 18px; font-size: 13px; color: oklch(0.55 0 0); }
+  .sim-tabs b { color: var(--fg); font-weight: 500; position: relative; }
+  .sim-tabs b::after { content: ""; position: absolute; left: 0; right: 0; bottom: -14px; height: 2px; background: var(--primary); }
+  .sim-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .sim-search { width: 150px; height: 30px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); font-size: 11.5px; color: oklch(0.62 0 0); display: flex; align-items: center; padding: 0 9px; }
+  .sim-btn { height: 30px; padding: 0 11px; border-radius: 6px; background: var(--primary); color: #fff; font-size: 12px; display: flex; align-items: center; gap: 5px; }
+
+  .sim-container { max-width: 1000px; margin: 0 auto; padding: 0 32px 40px; }
+  .sim-head { padding-top: 26px; }
+  .sim-head h4 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .sim-head .count { font-size: 12px; color: oklch(0.55 0 0); margin-top: 2px; }
+  .sim-head .hint { font-size: 13.5px; line-height: 1.7; color: oklch(0.42 0 0); margin-top: 11px; }
+
+  .sim-grid { display: grid; grid-template-columns: minmax(0,1fr) 236px; margin-top: 4px; }
+  .sim-main { padding-right: 32px; min-width: 0; }
+  .sim-aside { border-left: 1px solid var(--border); padding-left: 24px; padding-top: 24px; }
+  .aside-title { font-size: 12px; font-weight: 500; letter-spacing: 0.06em; color: oklch(0.55 0 0); }
+  .aside-list { margin-top: 11px; display: flex; flex-direction: column; gap: 9px; }
+  .aside-item { display: flex; gap: 9px; font-size: 12.5px; line-height: 1.55; color: oklch(0.35 0 0); }
+  .aside-item span { width: 10px; flex: none; font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.7 0 0); padding-top: 1px; }
+
+  /* ---------- 要闻栏 ---------- */
+  .bulletin { margin: 24px 0 20px; }
+  .bulletin-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+  .bcard { display: block; text-decoration: none; color: inherit; cursor: pointer; }
+  .bcard-label {
+    display: flex; align-items: baseline; gap: 5px; font-size: 11.5px; line-height: 1.35;
+    color: oklch(0.5 0 0); letter-spacing: 0.02em;
+  }
+  .bcard-label i { width: 5px; height: 5px; border-radius: 50%; flex: none; transform: translateY(-1px); }
+  .bcard-label em { font-style: normal; color: oklch(0.12 0 0); font-weight: 500; }
+  .bcard-label u { text-decoration: none; margin-left: auto; color: oklch(0.68 0 0); font-size: 10.5px; font-family: ui-monospace, monospace; }
+  .bcard-img {
+    margin-top: 6px; aspect-ratio: 2.4 / 1; border-radius: 4px; overflow: hidden;
+    background: oklch(0.9 0.01 250); position: relative;
+  }
+  .bcard-img > .ph { position: absolute; inset: 0; }
+  .bcard-img > .ph::after {
+    content: ""; position: absolute; inset: 0;
+    background-image: repeating-linear-gradient(-45deg, rgba(255,255,255,0.34) 0 1px, transparent 1px 7px);
+  }
+  .bcard-img .tagph {
+    position: absolute; right: 5px; bottom: 4px; font-size: 9px;
+    font-family: ui-monospace, monospace; color: rgba(255,255,255,0.82);
+    letter-spacing: 0.04em; mix-blend-mode: luminance;
+  }
+  .bcard-title {
+    margin-top: 6px; font-size: 13px; line-height: 1.5; color: oklch(0.18 0 0);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    min-height: 39px;
+  }
+  .bcard:hover .bcard-title { color: var(--primary); }
+  .bcard-label u, .bcard-title { transition: color 120ms ease; }
+
+  .bcard.is-enter { animation: fadeIn 220ms ease both; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .bulletin-foot {
+    display: flex; align-items: center; gap: 10px; margin-top: 10px;
+    font-size: 10.5px; color: oklch(0.62 0 0);
+  }
+  .bulletin-foot .bars { display: flex; gap: 4px; align-items: center; }
+  .bulletin-foot .bars span {
+    height: 2px; width: 12px; border-radius: 1px; background: oklch(0.88 0 0);
+    transition: background 160ms ease, width 160ms ease;
+  }
+  .bulletin-foot .bars span.on { background: var(--primary); width: 18px; }
+  .bulletin-foot .pause { margin-left: auto; display: flex; align-items: center; gap: 4px; cursor: pointer; color: oklch(0.62 0 0); background: none; border: 0; font-size: 10.5px; padding: 2px 0; }
+  .bulletin-foot .pause:hover { color: var(--fg); }
+
+  /* 无图降级 */
+  .bcard.noimg .bcard-img { display: none; }
+  .bcard.noimg .bcard-blank {
+    margin-top: 6px; height: 89px; border-radius: 4px; background: oklch(0.955 0.004 280);
+    border-left: 2px solid var(--primary); padding: 9px 11px; display: flex; flex-direction: column;
+    justify-content: space-between;
+  }
+  .bcard-blank .big { font-size: 13px; line-height: 1.45; font-weight: 500; color: oklch(0.2 0 0); }
+  .bcard-blank .small { font-size: 10px; font-family: ui-monospace, monospace; color: oklch(0.62 0 0); letter-spacing: 0.03em; }
+
+  /* ---------- 帖子行模拟 ---------- */
+  .prow { border-bottom: 1px solid oklch(0.93 0 0); padding: 16px 0; }
+  .prow-meta { display: flex; align-items: center; gap: 7px; font-size: 12px; color: oklch(0.55 0 0); }
+  .prow-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; background: var(--muted); padding: 1px 6px; border-radius: 4px; color: oklch(0.38 0 0); }
+  .prow-tag i { width: 5px; height: 5px; border-radius: 50%; }
+  .prow-title { margin-top: 8px; font-size: 15.5px; font-weight: 500; line-height: 1.5; color: var(--fg); }
+  .prow-body { margin-top: 6px; font-size: 13.5px; line-height: 1.7; color: oklch(0.4 0 0); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .prow-foot { margin-top: 10px; display: flex; align-items: center; gap: 6px; font-size: 12px; color: oklch(0.55 0 0); }
+  .av { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9.5px; color: #fff; flex: none; }
+  .prow-foot b { font-weight: 400; color: oklch(0.35 0 0); }
+
+  /* ---------- 形态对比小样 ---------- */
+  .forms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 22px 0 8px; }
+  .form {
+    border: 1px solid var(--border); border-radius: 8px; background: var(--card);
+    padding: 14px; text-align: left;
+  }
+  .form.pick { border-color: var(--primary); box-shadow: 0 0 0 3px oklch(0.5 0.2 285 / 0.07); }
+  .form .fh { font-size: 12.5px; font-weight: 600; margin-bottom: 3px; }
+  .form .fh s { text-decoration: none; font-weight: 400; font-size: 10.5px; color: var(--muted-fg); margin-left: 5px; }
+  .form .fd { font-size: 11.5px; line-height: 1.6; color: oklch(0.45 0 0); margin: 0; }
+  .form .mini { margin: 11px 0 9px; display: flex; gap: 4px; align-items: flex-start; }
+  .form .mini i { display: block; background: oklch(0.885 0.008 260); border-radius: 2px; }
+  .form .mini .h { height: 34px; }
+  .form .mini .s { height: 34px; }
+  .form .mini .line { height: 5px; background: oklch(0.92 0 0); border-radius: 1px; margin-top: 4px; }
+
+  /* ---------- 时间轴 ---------- */
+  .timeline { margin: 18px 0 24px; border-left: 1px solid var(--border); padding-left: 18px; }
+  .tl { position: relative; margin-bottom: 16px; }
+  .tl::before {
+    content: ""; position: absolute; left: -22px; top: 6px; width: 7px; height: 7px;
+    border-radius: 50%; background: oklch(0.85 0 0); border: 1.5px solid var(--bg);
+  }
+  .tl.key::before { background: var(--primary); }
+  .tl b { font-family: ui-monospace, monospace; font-size: 11px; color: var(--primary); margin-right: 8px; }
+  .tl p { margin: 2px 0 0; font-size: 13px; }
+
+  /* ---------- 编码块 ---------- */
+  pre {
+    background: oklch(0.975 0 0); border: 1px solid var(--border); border-radius: 6px;
+    padding: 15px 16px; overflow-x: auto; margin: 14px 0 22px;
+    font-family: ui-monospace, "Cascadia Code", monospace; font-size: 11.8px; line-height: 1.72;
+    color: oklch(0.28 0 0);
+  }
+  pre .k { color: oklch(0.45 0.15 285); }
+  pre .s { color: oklch(0.45 0.1 155); }
+  pre .c { color: oklch(0.62 0 0); }
+
+  /* ---------- 清单 ---------- */
+  .card-list { display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 18px 0 24px; }
+  .card-list > div { background: var(--card); padding: 13px 16px; display: flex; gap: 14px; align-items: baseline; }
+  .card-list .k { font-family: ui-monospace, monospace; font-size: 11.5px; color: oklch(0.4 0 0); flex: none; width: 176px; }
+  .card-list .v { font-size: 12.5px; line-height: 1.6; color: oklch(0.3 0 0); }
+
+  .do, .dont { border-radius: 6px; padding: 14px 17px; margin: 14px 0; font-size: 13px; }
+  .do { background: oklch(0.52 0.09 155 / 0.06); border-left: 2px solid var(--dot-kb); }
+  .dont { background: oklch(0.55 0.13 45 / 0.055); border-left: 2px solid var(--dot-rd); }
+  .do b, .dont b { display: block; font-size: 11px; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .do b { color: var(--dot-kb); }
+  .dont b { color: var(--dot-rd); }
+  .do ul, .dont ul { margin: 0; padding-left: 17px; }
+  .do li, .dont li { font-size: 12.8px; margin-bottom: 5px; }
+
+  .pick-list { counter-reset: p; list-style: none; padding: 0; margin: 18px 0; }
+  .pick-list li {
+    counter-increment: p; position: relative; padding: 14px 0 14px 40px;
+    border-bottom: 1px solid var(--border); margin: 0; font-size: 13px;
+  }
+  .pick-list li:last-child { border-bottom: 0; }
+  .pick-list li::before {
+    content: counter(p, decimal-leading-zero); position: absolute; left: 0; top: 15px;
+    font-family: ui-monospace, monospace; font-size: 11px; color: var(--primary);
+  }
+  .pick-list b { display: block; margin-bottom: 3px; font-size: 13.5px; }
+
+  .foot { margin-top: 70px; padding-top: 22px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted-fg); }
+
+  @media (max-width: 720px) {
+    .wrap { padding: 34px 18px 80px; }
+    h1 { font-size: 23px; }
+    .forms { grid-template-columns: 1fr; }
+    .sim-aside { display: none; }
+    .sim-grid { grid-template-columns: 1fr; }
+    .sim-main { padding-right: 0; }
+    .card-list > div { flex-direction: column; gap: 3px; }
+    .card-list .k { width: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap wide">
+
+  <h1>论坛要闻栏 · 设计方案 v1.0</h1>
+  <div class="meta">
+    <span>2026-11-18</span><span>位置：列表页标题之下、帖子流之上</span><span>三板块：思政 / 热点 / 快报</span>
+  </div>
+
+  <div class="verdict">
+    <div class="tag">一句话结论</div>
+    <p><strong>做成「三格并置、整组翻页」的要闻栏，不做单幅大轮播。</strong></p>
+    <p>三个板块常驻可见，每 5.5 秒整组交叉淡入换成下一条——不是三格各转各的。高度锁死在 <strong>155px</strong>（含标签行与两行标题），代价是首屏少 1.2 条帖子，换来 3 条要闻。</p>
+  </div>
+
+  <!-- ============ 1 ============ -->
+  <h2><span class="num">01</span>先说位置与代价</h2>
+
+  <p>你要的位置是「标题之下、帖子流之上」。这个位置在论坛里是最贵的——它是首屏唯一能放内容的地方。我把现在的首屏预算量了一遍：</p>
+
+  <table>
+    <thead>
+      <tr><th>首屏构成（1440×900 视口）</th><th class="num">高度</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>吸顶工具条</td><td class="num">48px</td></tr>
+      <tr><td>标题区（h1 + 计数 + 分类说明）</td><td class="num">约 88px</td></tr>
+      <tr><td>单条帖子行（元信息 + 标题 + 2 行摘要 + 脚注）</td><td class="num">约 163px</td></tr>
+      <tr class="bad"><td>现状：一屏可见帖子</td><td class="num">4.2 条</td></tr>
+      <tr class="bad"><td>加 155px 要闻栏后（含间距 199px）</td><td class="num">3.0 条</td></tr>
+    </tbody>
+  </table>
+
+  <p>少 1.2 条。这个代价我不打算藏着——但我认为值得，理由是要闻栏本身是<strong>内容</strong>，不是装饰。首屏从「4 条帖子」变成「3 条要闻 + 3 条帖子」，信息量是升的，只是内容类型变多了。</p>
+
+  <p>但如果做到 200px 以上，就变成「论坛被一个 banner 挤走了」，那就错了。所以下面所有尺寸都是从这个 <strong>155px 上限</strong>倒推出来的。</p>
+
+  <div class="dont">
+    <b>明确不做的事</b>
+    <ul>
+      <li>不做 16:9 大图通栏。668px 宽的容器里 16:9 是 375px 高，一屏只剩 1 条帖子。</li>
+      <li>不做「首屏遮挡式」弹窗或全屏引导。</li>
+      <li>不做比帖子标题更抢眼的字号。要闻栏是「提要」，不是「主体」。</li>
+    </ul>
+  </div>
+
+  <!-- ============ 2 ============ -->
+  <h2><span class="num">02</span>三种形态，我推荐第三个</h2>
+
+  <div class="forms">
+    <div class="form">
+      <div class="fh">A. 单幅通栏轮播<s>常见做法</s></div>
+      <div class="mini">
+        <div style="flex:1"><i class="h" style="width:100%;height:74px"></i><div class="line" style="width:78%"></div><div class="line" style="width:52%"></div></div>
+      </div>
+      <p class="fd">一次只露一个板块，剩下两个藏在圆点后面。整块占 220–375px 高。</p>
+    </div>
+    <div class="form">
+      <div class="fh">B. 跑马灯横滑<s>最省空间</s></div>
+      <div class="mini">
+        <div style="flex:1;overflow:hidden;display:flex;gap:4px">
+          <i class="h" style="width:60px;flex:none"></i><i class="h" style="width:60px;flex:none"></i><i class="h" style="width:60px;flex:none;opacity:.4"></i>
+        </div>
+      </div>
+      <p class="fd">无限向左滚动，只占 60px 高。但内容永远不会停，读不完，且最像廉价公告屏。</p>
+    </div>
+    <div class="form pick">
+      <div class="fh">C. 三格并置 · 整组翻页<s>推荐</s></div>
+      <div class="mini">
+        <div style="flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
+          <i class="h" style="width:100%"></i><i class="h" style="width:100%"></i><i class="h" style="width:100%"></i>
+        </div>
+      </div>
+      <p class="fd">三个板块同一水平线常驻可见，每格内部随节拍一起换图。高度锁 155px。</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>对比项</th><th>A 单幅轮播</th><th>B 跑马灯</th><th>C 三格并置</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>三板块是否同时可见</td><td>否，要等</td><td>是</td><td><strong>是</strong></td></tr>
+      <tr><td>占用高度</td><td>220–375px</td><td>约 60px</td><td><strong>155px</strong></td></tr>
+      <tr><td>读得完吗</td><td>要盯着等它转</td><td>永远读不完</td><td><strong>一眼扫完</strong></td></tr>
+      <tr><td>和论坛气质的距离</td><td>像视频网站首页</td><td>像车站电子屏</td><td><strong>像报纸栏目条</strong></td></tr>
+      <tr><td>移动端</td><td>勉强</td><td>可</td><td><strong>横滑，很自然</strong></td></tr>
+    </tbody>
+  </table>
+
+  <p>选 C 的核心理由：<strong>你提了三个板块，而轮播的本质是「一次只能看一个」</strong>。三个板块地位对等，凭什么让「思政」在圆点后面排队等 11 秒？并置才符合它们的关系。</p>
+
+  <!-- ============ 3 ============ -->
+  <h2><span class="num">03</span>推荐方案精确稿（桌面）</h2>
+
+  <p>下面是按真实像素做的静态稿：容器 1000px、左列 668px、三格各 214.7px、图 2.4:1 即 89px 高。可以点、可以看它自己翻页，鼠标移上去会停。</p>
+
+  <div class="frame">
+    <div class="frame-bar"><i></i><i></i><i></i><div class="url">localhost:3000/forum</div></div>
+    <div class="frame-body">
+      <div class="sim">
+        <div class="sim-topbar">
+          <div class="sim-brand">有邻<s>论坛</s></div>
+          <div class="sim-tabs"><b>全部</b><span>招领</span><span>求助</span><span>活动</span><span>社团</span><span>讲座</span><span>闲置</span></div>
+          <div class="sim-right">
+            <div class="sim-search">搜索帖子、地点</div>
+            <div class="sim-btn">✎ 发帖</div>
+          </div>
+        </div>
+
+        <div class="sim-container">
+          <div class="sim-head">
+            <h4>校园论坛</h4>
+            <div class="count">共 24 条 · 今天 6 条新帖</div>
+            <div class="hint">有人在问，也有人在答。</div>
+          </div>
+
+          <div class="sim-grid">
+            <div class="sim-main">
+
+              <!-- 要闻栏 -->
+              <section class="bulletin" id="bulletin">
+                <div class="bulletin-grid" id="bgrid"></div>
+                <div class="bulletin-foot">
+                  <div class="bars" id="bbars"><span class="on"></span><span></span><span></span></div>
+                  <button class="pause" id="bpause" type="button">暂停</button>
+                </div>
+              </section>
+
+              <!-- 帖子流 -->
+              <div class="prow">
+                <div class="prow-meta">
+                  <span class="prow-tag"><i style="background:oklch(0.55 0.13 45)"></i>求助</span>
+                  <span>三食堂后门</span><span>·</span><span>12 分钟前</span>
+                </div>
+                <div class="prow-title">有人知道三食堂后门那个修车摊还在吗</div>
+                <div class="prow-body">上周轮胎扎了，去的时候卷帘门是关的。群里说老板回老家了，也有人说只是周三休息。有谁知道具体的吗？</div>
+                <div class="prow-foot"><span class="av" style="background:oklch(0.55 0.06 30)">林</span><b>林知夏</b><span>·</span><span>4 条回复 · 陈屿 2 分钟前</span></div>
+              </div>
+
+              <div class="prow">
+                <div class="prow-meta">
+                  <span class="prow-tag"><i style="background:oklch(0.52 0.09 155)"></i>招领</span>
+                  <span>图书馆 3 楼</span><span>·</span><span>1 小时前</span>
+                </div>
+                <div class="prow-title">图书馆三楼靠窗座位捡到一张校园卡，姓名末尾是「涵」</div>
+                <div class="prow-body">卡片放在三楼服务台了，跟阿姨说了一声。姓王的同学，学号后四位 2207，自己来取就行，别急。</div>
+                <div class="prow-foot"><span class="av" style="background:oklch(0.5 0.07 200)">周</span><b>周迟</b><span>·</span><span>还没有人回复，也许你能帮上忙</span></div>
+              </div>
+
+              <div class="prow">
+                <div class="prow-meta">
+                  <span class="prow-tag"><i style="background:oklch(0.5 0.2 285)"></i>活动</span>
+                  <span>大学生活动中心 301</span><span>·</span><span>3 小时前</span>
+                </div>
+                <div class="prow-title">周五晚七点，旧书交换，带三本换三本</div>
+                <div class="prow-body">不用报名，直接来。教材、小说、杂志都行，太破的就算了。上次剩了二十多本，这次桌子够用。</div>
+                <div class="prow-foot"><span class="av" style="background:oklch(0.52 0.08 120)">许</span><b>许清和</b><span>·</span><span>9 条回复 · 楼主 26 分钟前</span></div>
+              </div>
+            </div>
+
+            <aside class="sim-aside">
+              <div class="aside-title">本周热议</div>
+              <div class="aside-list">
+                <div class="aside-item"><span>1</span><div>研究生宿舍什么时候能装空调</div></div>
+                <div class="aside-item"><span>2</span><div>三食堂后门修车摊还在吗</div></div>
+                <div class="aside-item"><span>3</span><div>周五旧书交换，带三本换三本</div></div>
+                <div class="aside-item"><span>4</span><div>选课系统又崩了</div></div>
+                <div class="aside-item"><span>5</span><div>求推荐附近配钥匙的地方</div></div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap">↑ 可交互静态稿。图块为占位（斜纹），实际为 2.4:1 实拍图。悬停整块暂停翻页，右下角可手动切组。</p>
+
+  <h3>尺寸明细（逐项可核对）</h3>
+  <div class="card-list">
+    <div><div class="k">容器 / 左列</div><div class="v">1000px 容器 − 32×2 内边距 = 936px；减去右栏 236px = 左列 700px；再减 <code>lg:pr-8</code> = <strong>668px 可用</strong></div></div>
+    <div><div class="k">三格宽度</div><div class="v">(668 − 12×2) ÷ 3 = <strong>214.7px</strong>，<code>grid-cols-3 gap-3</code></div></div>
+    <div><div class="k">图片比例</div><div class="v"><strong>2.4 : 1</strong> → 89.4px 高。<code>aspect-[12/5]</code>。选它是因为 16:9 会顶到 121px，超预算</div></div>
+    <div><div class="k">单格纵向</div><div class="v">标签行 15 + 6 + 图 89 + 6 + 标题 2 行 39 = <strong>155px</strong></div></div>
+    <div><div class="k">整块占位</div><div class="v">上间距 24（<code>mt-6</code>）+ 155 + 指示条 22 + 下间距 20 ≈ <strong>199px</strong></div></div>
+    <div><div class="k">字号</div><div class="v">板块名 <strong>11.5px</strong>／期号日期 10.5px 等宽／标题 <strong>13px</strong> 行高 1.5 限 2 行</div></div>
+    <div><div class="k">圆角 / 描边</div><div class="v">图 <strong>4px</strong>，卡片无边框无底色，全靠留白分隔。不加阴影</div></div>
+  </div>
+
+  <p>注意标题区现在是 88px（h1 + 计数 + 分类说明）。加了要闻栏后，<strong>分类说明那行「有人在问，也有人在答」建议收进要闻栏的同一视觉带</strong>，否则首屏上半部会变成「标题 + 说明 + 要闻 + 说明」四层浅字，很吵。这一点我在第 06 节讲。</p>
+
+  <!-- ============ 4 ============ -->
+  <h2><span class="num">04</span>移动端：横滑，不做自动播放</h2>
+
+  <p>375px 屏幕上三格并排每格只剩 105px，图会缩成邮票。所以移动端换成横向 <code>scroll-snap</code>：每卡 76vw，右边露出一角提示可滑。</p>
+
+  <div style="max-width:375px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);margin:20px 0 8px">
+    <div style="background:var(--bg);padding:16px 16px 0">
+      <div style="font-size:19px;font-weight:600;letter-spacing:-0.01em">校园论坛</div>
+      <div style="font-size:11.5px;color:oklch(0.55 0 0);margin-top:2px">共 24 条 · 今天 6 条新帖</div>
+      <div style="font-size:13px;color:oklch(0.42 0 0);margin-top:10px">有人在问，也有人在答。</div>
+
+      <div style="display:flex;gap:10px;overflow:hidden;margin-top:16px">
+        <div style="flex:none;width:253px">
+          <div style="display:flex;align-items:baseline;gap:5px;font-size:11.5px;color:oklch(0.5 0 0)">
+            <i style="width:5px;height:5px;border-radius:50%;background:var(--dot-sz);display:block"></i>
+            <em style="font-style:normal;color:var(--fg);font-weight:500">思政</em>
+            <u style="text-decoration:none;margin-left:auto;font-size:10.5px;color:oklch(0.68 0 0);font-family:ui-monospace,monospace">第 12 期</u>
+          </div>
+          <div style="margin-top:6px;aspect-ratio:2.4/1;border-radius:4px;background:oklch(0.9 0.01 250);position:relative;overflow:hidden">
+            <div style="position:absolute;inset:0;background-image:repeating-linear-gradient(-45deg,rgba(255,255,255,.34) 0 1px,transparent 1px 7px)"></div>
+          </div>
+          <div style="margin-top:6px;font-size:13px;line-height:1.5;color:oklch(0.18 0 0);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:39px">习近平新时代中国特色社会主义思想概论集体备课会召开</div>
+        </div>
+        <div style="flex:none;width:253px;opacity:.55">
+          <div style="display:flex;align-items:baseline;gap:5px;font-size:11.5px;color:oklch(0.5 0 0)">
+            <i style="width:5px;height:5px;border-radius:50%;background:var(--dot-rd);display:block"></i>
+            <em style="font-style:normal;color:var(--fg);font-weight:500">热点</em>
+          </div>
+          <div style="margin-top:6px;aspect-ratio:2.4/1;border-radius:4px;background:oklch(0.9 0.008 40)"></div>
+          <div style="margin-top:6px;font-size:13px;line-height:1.5;color:oklch(0.18 0 0);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:39px">冷空气今夜到，明天最低 2℃</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:4px;margin-top:12px;align-items:center">
+        <span style="height:2px;width:18px;border-radius:1px;background:var(--primary)"></span>
+        <span style="height:2px;width:12px;border-radius:1px;background:oklch(0.88 0 0)"></span>
+        <span style="height:2px;width:12px;border-radius:1px;background:oklch(0.88 0 0)"></span>
+      </div>
+
+      <div style="border-top:1px solid oklch(0.93 0 0);margin-top:16px;height:1px"></div>
+      <div style="padding:16px 0 16px">
+        <div class="prow-meta" style="padding:0"><span class="prow-tag"><i style="background:oklch(0.55 0.13 45)"></i>求助</span><span>三食堂后门</span><span>·</span><span>12 分钟前</span></div>
+        <div class="prow-title" style="font-size:15px">有人知道三食堂后门那个修车摊还在吗</div>
+      </div>
+    </div>
+  </div>
+  <p class="cap">↑ 移动端静态稿。卡片 76vw，右侧露出下一张的边缘。</p>
+
+  <div class="card-list">
+    <div><div class="k">卡片宽度</div><div class="v"><code>w-[76vw] max-w-[300px]</code>，每屏 1.3 张，露出边缘提示可滑</div></div>
+    <div><div class="k">交互</div><div class="v"><code>scroll-snap-type: x mandatory</code> + <code>scroll-snap-align: start</code>，无滚动条</div></div>
+    <div><div class="k">自动播放</div><div class="v"><strong>关</strong>。手指已经在滑了，再自动跑会打架（这是绝大多数移动端轮播做错的地方）</div></div>
+    <div><div class="k">高度</div><div class="v">标签 15 + 图 105 + 标题 39 ≈ <strong>178px</strong>，比桌面高是因为卡更宽，比例仍是 2.4:1</div></div>
+  </div>
+
+  <!-- ============ 5 ============ -->
+  <h2><span class="num">05</span>「滚动」到底怎么滚</h2>
+
+  <p>这是最容易做错的地方。三个板块如果各自独立计时，屏幕上会同时有三种频率的动，眼睛一直在追。所以：<strong>三格共享一个节拍，整组一起换。</strong></p>
+
+  <div class="timeline">
+    <div class="tl key"><b>0ms</b><p>组的第 1 条可见（思政 #1 / 热点 #1 / 快报 #1）</p></div>
+    <div class="tl"><b>0–5500</b><p>静止。人读标题大概需要 3–4 秒，留 5.5 秒是给「读不顺再读一遍」的余量</p></div>
+    <div class="tl key"><b>5500ms</b><p>整组三格同步 <code>opacity 1→0</code>，110ms</p></div>
+    <div class="tl key"><b>5610ms</b><p>内容替换为组 #2，<code>opacity 0→1</code>，110ms</p></div>
+    <div class="tl"><b>5720ms</b><p>完成。下一轮计时重新开始。总动效 <strong>220ms</strong></p></div>
+  </div>
+
+  <table>
+    <thead><tr><th>行为</th><th>规格</th><th>为什么</th></tr></thead>
+    <tbody>
+      <tr><td>切换方式</td><td><strong>交叉淡入</strong>，不做横向位移</td><td>位移是 App 语言（卡片流）；淡入是纸媒语言（翻页）。位移还会带着视线往左跑</td></tr>
+      <tr><td>节拍</td><td><strong>5.5 秒</strong></td><td>3 秒是刷广告的节奏，读不完成句中文标题</td></tr>
+      <tr><td>hover / focus</td><td>整组暂停</td><td>鼠标停在某条上就是「我要看这条」</td></tr>
+      <tr><td>标签页隐藏</td><td><code>document.hidden</code> 时暂停</td><td>否则切回来会看到它跳了好几条</td></tr>
+      <tr><td>减少动效</td><td><code>prefers-reduced-motion</code> 时<strong>完全不自动</strong></td><td>只留手动切换。这条是 WCAG 硬要求，也照顾晕动症用户</td></tr>
+      <tr><td>暂停按钮</td><td>左下指示条右侧，一个文字「暂停 / 继续」</td><td>WCAG 2.2.2：超过 5 秒的自动移动内容必须可暂停，且不能只靠 hover</td></tr>
+      <tr><td>指示条</td><td>3 条 2px 短横，当前 18px 紫、其余 12px 灰</td><td>短横线比圆点更像报纸页码，也更容易看清「这是第几组」</td></tr>
+      <tr><td>组数</td><td>等于每板块条数（3 条 → 3 组）</td><td>三板块数量必须一致，否则末组会有一格空着</td></tr>
+    </tbody>
+  </table>
+
+  <div class="dont">
+    <b>这些是「AI 味」的高发区，逐条禁止</b>
+    <ul>
+      <li>禁止图片 hover 放大 / 加遮罩 / 出现「查看详情」按钮——那是电商</li>
+      <li>禁止在图上压大标题和半透明黑渐变——那是视频网站封面</li>
+      <li>禁止圆角 &gt; 4px、禁止 box-shadow、禁止任何发光与描边渐变</li>
+      <li>禁止用彩色圆点 + 数字做指示器（「1/3」的胶囊）</li>
+      <li>禁止入场时逐格延迟 80ms 的错峰动画——那是落地页</li>
+    </ul>
+  </div>
+
+  <!-- ============ 6 ============ -->
+  <h2><span class="num">06</span>视觉语言：沿用现有 token，只加三个点</h2>
+
+  <p>上一轮改造已经定了规矩：颜色稀缺才有指向性。这个原则在这里继续用——<strong>三个板块的区分只靠一个 5px 圆点</strong>，不靠背景色、不靠边框、不靠标签底色。</p>
+
+  <div class="card-list">
+    <div><div class="k">底色</div><div class="v"><code>--background</code> 直接透出，要闻栏不套卡片、不加白底。<strong>不套卡片是关键</strong>——一旦套了，它就从「报纸栏目」变成「广告位」</div></div>
+    <div><div class="k">分隔</div><div class="v">三格之间只有 12px 空隙，没有竖线。要闻栏与帖子流之间也不加横线，靠 20px 留白断开</div></div>
+    <div><div class="k">板块名</div><div class="v">11.5px，<code>foreground/85</code> 作主体色；前面 5px 圆点用语义色</div></div>
+    <div><div class="k">三个点色</div><div class="v">思政 <code>primary</code>（现成紫）／热点 <code>oklch(0.55 0.13 45)</code> 赭／快报 <code>oklch(0.52 0.09 155)</code> 墨绿。饱和度都压在 0.09–0.13，且<strong>全页只出现在这三个 5px 圆点里</strong></div></div>
+    <div><div class="k">期号 / 时间</div><div class="v">10.5px 等宽，<code>foreground/45</code>，右对齐。跟右侧「本周热议」序号用同一套等宽数字</div></div>
+    <div><div class="k">标题</div><div class="v">13px / 1.5 / 限 2 行 / <code>foreground</code>。比帖子标题（15.5px）小一档，明确「次要」</div></div>
+    <div><div class="k">动效</div><div class="v">只有 <code>opacity</code> 与 <code>color</code>，120 / 220ms。<code>ease</code>，不用 spring</div></div>
+  </div>
+
+  <h3>与标题区的一处联动调整</h3>
+  <p>现在标题区是三层：h1「校园论坛」→ 计数「共 24 条」→ 分类说明「有人在问，也有人在答。」再加上要闻栏，上半屏会出现四个层级，很碎。建议：</p>
+  <ul>
+    <li>把<strong>分类说明缩短到一行以内</strong>，或者只在「全部」之外的分页显示（进「求助」才显示「问一句不丢人」）</li>
+    <li>要闻栏和分类说明之间<strong>只留 24px</strong>，不要再加分割线</li>
+    <li>h1 与要闻栏之间保持 26–28px，让 h1 有「报头」的分量</li>
+  </ul>
+
+  <!-- ============ 7 ============ -->
+  <h2><span class="num">07</span>数据从哪来</h2>
+
+  <p>第一版<strong>不建表</strong>。论坛刚改完，为三张图动 schema 不划算。用静态数据模块，跟 <code>lib/campus/notices.ts</code> 完全同一种做法——那个文件里已经有 3 条公告是这么写的。</p>
+
+  <pre><span class="c">// lib/campus/bulletins.ts</span>
+<span class="k">export type</span> BulletinBoard = <span class="s">"思政"</span> | <span class="s">"热点"</span> | <span class="s">"快报"</span>;
+
+<span class="k">export type</span> Bulletin = {
+  id: string;
+  board: BulletinBoard;
+  title: string;
+  image?: string;        <span class="c">// 缺省则自动走无图版式，不留白框</span>
+  href: string;          <span class="c">// 站内 /forum/xxx 或外链</span>
+  publishedAt: string;   <span class="c">// "2026-11-18"</span>
+  source: string;        <span class="c">// "校党委宣传部" / "后勤处"</span>
+  issue?: string;        <span class="c">// "第 12 期"，思政与快报用</span>
+};
+
+<span class="c">// 三板块各取最新 N 条，对齐成"组"，保证每组三格都不空</span>
+<span class="k">export function</span> listBulletinGroups(size = 3): Bulletin[][]</pre>
+
+  <p>关键约束：<strong>三个板块的条数必须相等</strong>。否则最后一组会空一格，而空格是「未完成感」的最大来源。用 <code>size</code> 参数在取数时就截齐。</p>
+
+  <h3>九条种子文案</h3>
+  <p>上一轮我说过「现在的种子内容像通知，不像人说的话」。同理，这三块内容如果写成「XX 活动圆满举行」，要闻栏立刻变成宣传栏。所以每条都带一个具体物：数字、时间、地点、期号。</p>
+
+  <table>
+    <thead><tr><th style="width:56px">板块</th><th>标题</th><th style="width:130px">来源 / 期号</th></tr></thead>
+    <tbody>
+      <tr><td><strong style="color:var(--primary)">思政</strong></td><td>「概论」课集体备课会，把四史案例编进 12 个专题</td><td>校党委宣传部 · 第 12 期</td></tr>
+      <tr><td></td><td>师生赴红旗渠实践教学，走了 3 天 27 公里</td><td>马克思主义学院 · 第 11 期</td></tr>
+      <tr><td></td><td>「青年大学习」第 24 期已上线，各班团支书组织观看</td><td>校团委 · 今天 09:20</td></tr>
+      <tr><td><strong style="color:var(--dot-rd)">热点</strong></td><td>冷空气今夜到，明天最低 2℃，晾在楼下的衣服收一下</td><td>校气象站 · 今天 07:40</td></tr>
+      <tr><td></td><td>高校毕业生就业创业政策有调整，这三条和你直接相关</td><td>新华社 · 11-17</td></tr>
+      <tr><td></td><td>实验室安全新规：危化品领用改为线上审批</td><td>教育部网站 · 11-16</td></tr>
+      <tr><td><strong style="color:var(--dot-kb)">快报</strong></td><td>三食堂二楼 12 号窗口明天恢复供应</td><td>后勤处 · 今天 08:10</td></tr>
+      <tr><td></td><td>校运会 4×100 米接力，机械学院 42″7 破校纪录</td><td>体育部 · 11-17</td></tr>
+      <tr><td></td><td>图书馆新开 200 个自习座位，今晚 22:00 起预约</td><td>图书馆 · 今天 10:00</td></tr>
+    </tbody>
+  </table>
+
+  <p>这九条不是凑数的——每条都写了「谁、几点、多少」，因为<strong>细节是可信度的唯一来源</strong>。反过来，「热烈祝贺我校在XX比赛中取得佳绩」这种句子，不管配多好的图都救不回来。</p>
+
+  <!-- ============ 8 ============ -->
+  <h2><span class="num">08</span>图片：这个方案唯一的真实风险</h2>
+
+  <p>说句实话：<strong>这个方案的成败不取决于布局，取决于你手上有没有 9 张能用的图。</strong>用 stock 图或者 AI 生成的插画，整个首屏立刻回到「demo」——比不做更糟。</p>
+
+  <div class="do">
+    <b>合格的图</b>
+    <ul>
+      <li>校内实拍：会场、走廊、食堂窗口、操场、宿舍楼下</li>
+      <li>官方通稿图、校媒公众号推文的题图（需确认授权）</li>
+      <li>手机拍的也行——轻微倾斜、光线不均反而有人味</li>
+    </ul>
+  </div>
+  <div class="dont">
+    <b>不合格的图（出现一张就毁掉整体）</b>
+    <ul>
+      <li>通用商务 stock：握手、会议桌、城市剪影、地球仪</li>
+      <li>AI 生成图：多人面部变形、手指数量不对、文字是乱码</li>
+      <li>扁平滑板插画、卡通 icon 拼贴、3D 渲染的小人</li>
+      <li>带明显水印、带平台 logo 的网图</li>
+    </ul>
+  </div>
+
+  <h3>规格</h3>
+  <div class="card-list">
+    <div><div class="k">比例</div><div class="v"><strong>2.4 : 1</strong>（约 12:5）。裁切时保主体在水平中线，左右可各裁 10%</div></div>
+    <div><div class="k">尺寸</div><div class="v">≥ <strong>864 × 360</strong>（桌面 2x）。单张控制在 120KB 内，WebP 优先</div></div>
+    <div><div class="k">调性</div><div class="v">饱和度统一 <strong>−12% ~ −18%</strong>，轻微暖调。避免高饱和滤镜和 HDR 感</div></div>
+    <div><div class="k">存放</div><div class="v"><code>public/bulletins/</code>。注意本项目有 <code>basePath</code>（demo 模式为 <code>/demo</code>），路径必须拼 <code>NEXT_PUBLIC_BASE_PATH</code> 前缀，否则线上 404</div></div>
+    <div><div class="k">外链图</div><div class="v">当前 <code>next.config</code> 的 <code>images.remotePatterns</code> 没开外部图床。要用外链需加白名单</div></div>
+    <div><div class="k">alt</div><div class="v">写具体内容，不写「思政内容配图」</div></div>
+  </div>
+
+  <h3>没有图的时候怎么办</h3>
+  <p>这是必须提前定的，因为很可能第一批就凑不齐九张。方案是<strong>无图版式</strong>：不出现灰白占位框，直接变成一块极浅底 + 左侧 2px 板块色竖线 + 13px 加粗标题 + 底部期号。像《参考消息》的纯文字条，本身是完整的版式，不是「缺图」。</p>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0 10px;padding:18px;background:var(--card);border:1px solid var(--border);border-radius:8px">
+    <div class="bcard noimg">
+      <div class="bcard-label"><i style="background:var(--dot-sz)"></i><em>思政</em><u>第 12 期</u></div>
+      <div class="bcard-blank" style="border-left-color:var(--dot-sz)">
+        <div class="big">「概论」课集体备课会，把四史案例编进 12 个专题</div>
+        <div class="small">校党委宣传部</div>
+      </div>
+    </div>
+    <div class="bcard noimg">
+      <div class="bcard-label"><i style="background:var(--dot-rd)"></i><em>热点</em><u>07:40</u></div>
+      <div class="bcard-blank" style="border-left-color:var(--dot-rd)">
+        <div class="big">冷空气今夜到，明天最低 2℃</div>
+        <div class="small">校气象站</div>
+      </div>
+    </div>
+    <div class="bcard noimg">
+      <div class="bcard-label"><i style="background:var(--dot-kb)"></i><em>快报</em><u>08:10</u></div>
+      <div class="bcard-blank" style="border-left-color:var(--dot-kb)">
+        <div class="big">三食堂二楼 12 号窗口明天恢复供应</div>
+        <div class="small">后勤处</div>
+      </div>
+    </div>
+  </div>
+  <p class="cap">↑ 无图版式。高度与有图版一致（89px），混合排版也不会错位。</p>
+
+  <p>所以有图无图可以<strong>逐条混用</strong>：某一条有图就显示图，没有就走无图版式，网格高度不变。这样运营不必等九张图凑齐才上线。</p>
+
+  <!-- ============ 9 ============ -->
+  <h2><span class="num">09</span>落到代码上是哪几处</h2>
+
+  <p>位置很具体：<code>components/forum/forum-list.tsx</code> 第 152 行那个左列 <code>&lt;div className="min-w-0 lg:pr-8"&gt;</code> 内部，在 <code>{loading ? &lt;Skeleton /&gt; : null}</code> <strong>之前</strong>。不是放在 grid 外面全宽——全宽会变成 936px，三格各 304px，图高 127px，超预算。</p>
+
+  <div class="card-list">
+    <div><div class="k">新增</div><div class="v"><code>lib/campus/bulletins.ts</code>　类型 + 九条种子 + <code>listBulletinGroups()</code></div></div>
+    <div><div class="k">新增</div><div class="v"><code>components/forum/bulletin-board.tsx</code>　client 组件，含节拍、暂停、reduced-motion、无图降级</div></div>
+    <div><div class="k">改动</div><div class="v"><code>components/forum/forum-list.tsx</code>　左列顶部插入 <code>&lt;BulletinBoard /&gt;</code>，一行</div></div>
+    <div><div class="k">改动</div><div class="v"><code>app/(chat)/forum/page.tsx</code>　（可选）把 bulletins 当 props 传，若走静态 import 则不用改</div></div>
+    <div><div class="k">新增</div><div class="v"><code>public/bulletins/*.webp</code>　九张图，无图可先空着</div></div>
+    <div><div class="k">不改</div><div class="v">接口、数据库、schema、右侧栏、帖子行——<strong>一个都不动</strong></div></div>
+  </div>
+
+  <p>轮播不引库。项目里没有 embla / swiper，为了三格淡入装一个 30KB 的引擎不值得。核心就是一个 <code>setInterval</code> + 一个 <code>index</code> 状态，外加三个暂停条件（hover、<code>document.hidden</code>、reduced-motion）。移动端横滑交给 CSS <code>scroll-snap</code>，零 JS。</p>
+
+  <h3>加载与空态</h3>
+  <ul>
+    <li>首屏只请求当前这一组的 3 张图，其余 <code>loading="lazy"</code>。容器固定 <code>aspect-ratio</code>，不会有 CLS 跳动</li>
+    <li>图片加载中显示极浅底色（<code>--muted</code>），不加骨架屏动画——一块会呼吸的灰块比静灰更吵</li>
+    <li>某个板块一条数据都没有：<strong>整个要闻栏不渲染</strong>，不要把两格挤成三格，也不要显示「暂无内容」</li>
+  </ul>
+
+  <!-- ============ 10 ============ -->
+  <h2><span class="num">10</span>分两步做</h2>
+
+  <div class="pick-list">
+    <li>
+      <b>STEP 1 — 结构与静态（约 0.5 天）</b>
+      数据模块 + 组件骨架 + 三格栅格 + 无图版式 + 移动端横滑。<strong>不做自动翻页</strong>，先只显示第一组。这一步做完就能看出高度是否合适、首屏是否被压得太狠。
+    </li>
+    <li>
+      <b>STEP 2 — 节拍与打磨（约 0.5 天）</b>
+      交叉淡入、暂停条件、指示条、reduced-motion、图片接入与压缩、九条文案定稿。
+    </li>
+  </div>
+
+  <p>建议 STEP 1 做完你先在本地看一眼再决定 STEP 2 要不要改节拍或砍高度。<strong>如果 STEP 1 看完觉得首屏太挤，最省事的调整是把图压到 2.8:1（76px 高），整块降到 142px，不用推翻结构。</strong></p>
+
+  <!-- ============ 11 ============ -->
+  <h2><span class="num">11</span>需要你定的四件事</h2>
+
+  <div class="pick-list">
+    <li>
+      <b>形态</b>
+      我推荐 C（三格并置整组翻页）。如果你更想要「一次一张大图」的仪式感，选 A，那我需要把高度预算重算一遍——16:9 通栏会占 375px，得砍掉别的。
+    </li>
+    <li>
+      <b>点击后去哪</b>
+      三个选项：① 站内新页面 <code>/bulletin/[id]</code>（要再建一个详情页）② 跳论坛某个分类（最省事，但思政内容在论坛里没对应分类）③ 外链新窗口（适合热点新闻）。<strong>我倾向：思政与快报走站内图文页，热点走外链</strong>。但站内图文页是额外工作量，你要决定第一版做不做。
+    </li>
+    <li>
+      <b>图从哪来</b>
+      这批图谁出？如果近期拿不到，我建议<strong>第一版直接全用无图版式上线</strong>——它是完整设计，不是半成品，而且比配错图好看得多。等有图了逐条换。
+    </li>
+    <li>
+      <b>要不要可收起</b>
+      给一个「收起」按钮记到 localStorage，让常来的人省掉 199px。但这会增加状态复杂度。<strong>我的建议是：第一版不做</strong>，先看真实使用反馈；如果两周后有人抱怨挤，再加。
+    </li>
+  </div>
+
+  <div class="foot">
+    论坛要闻栏设计方案 v1.0 · 2026-11-18 · 尺寸基于 <code>max-w-[1000px]</code> 容器与 236px 右栏实测
+  </div>
+</div>
+
+<script>
+(function () {
+  // 三格数据：每块三条，对齐成三组
+  var groups = [
+    [
+      { board: "思政", dot: "oklch(0.5 0.2 285)", meta: "第 12 期", title: "「概论」课集体备课会，把四史案例编进 12 个专题", bg: "linear-gradient(135deg, oklch(0.82 0.02 285), oklch(0.74 0.03 300))" },
+      { board: "热点", dot: "oklch(0.55 0.13 45)", meta: "07:40", title: "冷空气今夜到，明天最低 2℃，晾在楼下的衣服收一下", bg: "linear-gradient(135deg, oklch(0.84 0.03 60), oklch(0.76 0.04 40))" },
+      { board: "快报", dot: "oklch(0.52 0.09 155)", meta: "08:10", title: "三食堂二楼 12 号窗口明天恢复供应", bg: "linear-gradient(135deg, oklch(0.82 0.02 160), oklch(0.75 0.03 145))" }
+    ],
+    [
+      { board: "思政", dot: "oklch(0.5 0.2 285)", meta: "第 11 期", title: "师生赴红旗渠实践教学，走了 3 天 27 公里", bg: "linear-gradient(135deg, oklch(0.8 0.02 270), oklch(0.72 0.035 290))" },
+      { board: "热点", dot: "oklch(0.55 0.13 45)", meta: "11-17", title: "高校毕业生就业创业政策有调整，这三条和你直接相关", bg: "linear-gradient(135deg, oklch(0.82 0.025 50), oklch(0.75 0.04 35))" },
+      { board: "快报", dot: "oklch(0.52 0.09 155)", meta: "11-17", title: "校运会 4×100 米接力，机械学院 42″7 破校纪录", bg: "linear-gradient(135deg, oklch(0.8 0.02 175), oklch(0.73 0.03 155))" }
+    ],
+    [
+      { board: "思政", dot: "oklch(0.5 0.2 285)", meta: "今天 09:20", title: "「青年大学习」第 24 期已上线，各班团支书组织观看", bg: "linear-gradient(135deg, oklch(0.83 0.018 280), oklch(0.75 0.03 295))" },
+      { board: "热点", dot: "oklch(0.55 0.13 45)", meta: "11-16", title: "实验室安全新规：危化品领用改为线上审批", bg: "linear-gradient(135deg, oklch(0.83 0.02 55), oklch(0.76 0.035 45))" },
+      { board: "快报", dot: "oklch(0.52 0.09 155)", meta: "今天 10:00", title: "图书馆新开 200 个自习座位，今晚 22:00 起预约", bg: "linear-gradient(135deg, oklch(0.81 0.02 165), oklch(0.74 0.03 150))" }
+    ]
+  ];
+
+  var grid = document.getElementById("bgrid");
+  var bars = document.getElementById("bbars");
+  var pauseBtn = document.getElementById("bpause");
+  var bulletin = document.getElementById("bulletin");
+  var index = 0;
+  var timer = null;
+  var userPaused = false;
+  var hovering = false;
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function render(next) {
+    grid.innerHTML = groups[next].map(function (item) {
+      return '<div class="bcard is-enter">' +
+        '<div class="bcard-label"><i style="background:' + item.dot + '"></i><em>' + item.board + '</em><u>' + item.meta + '</u></div>' +
+        '<div class="bcard-img"><div class="ph" style="background:' + item.bg + '"></div><div class="tagph">实拍 864×360</div></div>' +
+        '<div class="bcard-title">' + item.title + '</div>' +
+        '</div>';
+    }).join("");
+
+    var spans = bars.querySelectorAll("span");
+    for (var i = 0; i < spans.length; i++) {
+      spans[i].className = i === next ? "on" : "";
+    }
+  }
+
+  function stop() {
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+
+  function start() {
+    stop();
+    if (reduce || userPaused || hovering) { return; }
+    timer = setInterval(function () {
+      index = (index + 1) % groups.length;
+      render(index);
+    }, 5500);
+  }
+
+  pauseBtn.addEventListener("click", function () {
+    userPaused = !userPaused;
+    pauseBtn.textContent = userPaused ? "继续" : "暂停";
+    if (userPaused) { stop(); } else { start(); }
+  });
+
+  bulletin.addEventListener("mouseenter", function () { hovering = true; stop(); });
+  bulletin.addEventListener("mouseleave", function () { hovering = false; start(); });
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) { stop(); } else { start(); }
+  });
+
+  render(0);
+  if (reduce) {
+    pauseBtn.textContent = "已按系统设置停止翻页";
+    pauseBtn.disabled = true;
+  } else {
+    start();
+  }
+})();
+</script>
+</body>
+</html>

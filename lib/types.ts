@@ -1,9 +1,11 @@
 import type { InferUITool, UIMessage } from "ai";
 import { z } from "zod";
 import type { ArtifactKind } from "@/components/chat/artifact";
-import type { createDocument } from "./ai/tools/create-document";
 import type { campusTools } from "./ai/tools/campus";
+import type { createDocument } from "./ai/tools/create-document";
 import type { requestSuggestions } from "./ai/tools/request-suggestions";
+import type { imageTools } from "./ai/tools/search-images";
+import type { newsTools } from "./ai/tools/search-news";
 import type { updateDocument } from "./ai/tools/update-document";
 import type { Suggestion } from "./db/schema";
 
@@ -19,6 +21,8 @@ type updateDocumentTool = InferUITool<ReturnType<typeof updateDocument>>;
 type requestSuggestionsTool = InferUITool<
   ReturnType<typeof requestSuggestions>
 >;
+type imageToolSet = ReturnType<typeof imageTools>;
+type newsToolSet = ReturnType<typeof newsTools>;
 
 export type ChatTools = {
   createDocument: createDocumentTool;
@@ -35,6 +39,9 @@ export type ChatTools = {
   searchRepair: InferUITool<campusToolSet["searchRepair"]>;
   campusCard: InferUITool<campusToolSet["campusCard"]>;
   queryAccess: InferUITool<campusToolSet["queryAccess"]>;
+  searchImages: InferUITool<imageToolSet["searchImages"]>;
+  grabImage: InferUITool<imageToolSet["grabImage"]>;
+  searchNews: InferUITool<newsToolSet["searchNews"]>;
 };
 
 export type CampusTraceData = {

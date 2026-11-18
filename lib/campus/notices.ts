@@ -34,11 +34,17 @@ const notices: CampusNotice[] = [
   },
 ];
 
+export function listNotices(limit = 3): CampusNotice[] {
+  return [...notices]
+    .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+    .slice(0, limit);
+}
+
 export function searchNotices(query: string) {
   const text = query.trim();
   const hits = notices.filter((notice) =>
-    [notice.title, notice.body, notice.audience, ...notice.keywords].some((field) =>
-      text.includes(field) || field.includes(text.slice(0, 8))
+    [notice.title, notice.body, notice.audience, ...notice.keywords].some(
+      (field) => text.includes(field) || field.includes(text.slice(0, 8))
     )
   );
   const picked = hits.length > 0 ? hits : text.length < 2 ? notices : [];

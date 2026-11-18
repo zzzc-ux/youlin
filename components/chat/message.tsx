@@ -1,7 +1,7 @@
 "use client";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, LoaderCircleIcon } from "lucide-react";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
@@ -20,6 +20,8 @@ import { DocumentPreview } from "./document-preview";
 import { BrandMark } from "../effects/brand-mark";
 import { CampusToolChip } from "./campus-tool-chip";
 import { CampusTrace } from "./campus-trace";
+import { GrabbedImageCard, ImageSearchGrid, type ImageSearchItem } from "./image-search-result";
+import { NewsSearchList, type NewsSearchItem } from "./news-search-result";
 import { MessageActions } from "./message-actions";
 import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
@@ -41,6 +43,17 @@ function WaitingText() {
         duration={1}
       >
         {waitingText}
+      </Shimmer>
+    </div>
+  );
+}
+
+function ToolRunning({ label }: { label: string }) {
+  return (
+    <div className="glass inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-[13px]">
+      <LoaderCircleIcon className="size-3.5 animate-spin text-violet-600 dark:text-violet-300" />
+      <Shimmer as="span" className="font-medium" duration={1.2}>
+        {`${label}…`}
       </Shimmer>
     </div>
   );
@@ -273,6 +286,110 @@ const PurePreviewMessage = ({
           </ToolContent>
         </Tool>
       );
+    }
+
+    if (type === "tool-searchImages") {
+      const { toolCallId, state } = part;
+
+      if (state === "output-available") {
+        const output = part.output as {
+          error?: string;
+          images?: ImageSearchItem[];
+          note?: string;
+          query?: string;
+        };
+
+        if (output?.error) {
+          return (
+            <div
+              className="glass w-fit rounded-xl px-3.5 py-2.5 text-[13px] text-red-600 dark:text-red-300"
+              key={toolCallId}
+            >
+              {output.error}
+            </div>
+          );
+        }
+
+        return (
+          <ImageSearchGrid
+            images={output?.images ?? []}
+            key={toolCallId}
+            note={output?.note}
+            query={output?.query ?? ""}
+          />
+        );
+      }
+
+      return <ToolRunning key={toolCallId} label="正在搜索图片" />;
+    }
+
+    if (type === "tool-grabImage") {
+      const { toolCallId, state } = part;
+
+      if (state === "output-available") {
+        const output = part.output as {
+          bytes?: number;
+          error?: string;
+          ok?: boolean;
+          url?: string;
+        };
+
+        if (output?.ok && output.url) {
+          return (
+            <GrabbedImageCard
+              bytes={output.bytes ?? 0}
+              key={toolCallId}
+              url={output.url}
+            />
+          );
+        }
+
+        return (
+          <div
+            className="glass w-fit rounded-xl px-3.5 py-2.5 text-[13px] text-red-600 dark:text-red-300"
+            key={toolCallId}
+          >
+            保存图片失败：{output?.error ?? "未知错误"}
+          </div>
+        );
+      }
+
+      return <ToolRunning key={toolCallId} label="正在保存图片" />;
+    }
+
+    if (type === "tool-searchNews") {
+      const { toolCallId, state } = part;
+
+      if (state === "output-available") {
+        const output = part.output as {
+          error?: string;
+          news?: NewsSearchItem[];
+          note?: string;
+          query?: string;
+        };
+
+        if (output?.error) {
+          return (
+            <div
+              className="glass w-fit rounded-xl px-3.5 py-2.5 text-[13px] text-red-600 dark:text-red-300"
+              key={toolCallId}
+            >
+              {output.error}
+            </div>
+          );
+        }
+
+        return (
+          <NewsSearchList
+            key={toolCallId}
+            news={output?.news ?? []}
+            note={output?.note}
+            query={output?.query ?? ""}
+          />
+        );
+      }
+
+      return <ToolRunning key={toolCallId} label="正在搜索新闻" />;
     }
 
     return null;

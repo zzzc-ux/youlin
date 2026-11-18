@@ -11,7 +11,7 @@ import {
   searchForumPosts,
   updateForumPost,
 } from "@/lib/campus/forum";
-import { countForumComments } from "@/lib/campus/forum-comments";
+import { forumCommentStats } from "@/lib/campus/forum-comments";
 import { closeOwnItem } from "@/lib/campus/lost-found";
 
 const postSchema = z.object({
@@ -37,7 +37,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "帖子地址无效" }, { status: 400 });
     }
     const post = await getForumPostById(postId);
-    return NextResponse.json({ posts: post ? await withCommentCounts([publicPost(post, session.user.id)]) : [] });
+    return NextResponse.json({
+      posts: post
+        ? await withCommentCounts([publicPost(post, session.user.id)])
+        : [],
+    });
   }
   const query = searchParams.get("q") ?? "";
   const category = searchParams.get("category") ?? "";
@@ -50,17 +54,32 @@ export async function GET(request: Request) {
       ? await searchForumPosts(query, category || undefined)
       : await listForumPosts();
 
-  return NextResponse.json({ posts: await withCommentCounts(posts.map((post) => publicPost(post, session.user.id))) });
+  return NextResponse.json({
+    posts: await withCommentCounts(
+      posts.map((post) => publicPost(post, session.user.id))
+    ),
+  });
 }
 
-function publicPost<T extends { userId: string }>(post: T, currentUserId: string) {
+function publicPost<T extends { userId: string }>(
+  post: T,
+  currentUserId: string
+) {
   const { userId, ...rest } = post;
   return { ...rest, mine: userId === currentUserId };
 }
 
 async function withCommentCounts<T extends { id: string }>(posts: T[]) {
-  const counts = await countForumComments(posts.map((post) => post.id));
-  return posts.map((post) => ({ ...post, commentCount: counts.get(post.id) ?? 0 }));
+  const stats = await forumCommentStats(posts.map((post) => post.id));
+  return posts.map((post) => {
+    const stat = stats.get(post.id);
+    return {
+      ...post,
+      commentCount: stat?.count ?? 0,
+      lastReplyAt: stat?.lastReplyAt ?? null,
+      lastReplyAuthor: stat?.lastReplyAuthor ?? null,
+    };
+  });
 }
 
 export async function POST(request: Request) {
@@ -71,7 +90,10 @@ export async function POST(request: Request) {
 
   const parsed = postSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "请把标题和内容写完整" }, { status: 400 });
+    return NextResponse.json(
+      { error: "请把标题和内容写完整" },
+      { status: 400 }
+    );
   }
 
   const post = await createForumPost({
@@ -105,22 +127,36 @@ export async function PATCH(request: Request) {
   if (resolve.success) {
     const post = await getForumPostById(postId);
     if (!post || post.userId !== session.user.id) {
-      return NextResponse.json({ error: "只能操作自己发布的帖子" }, { status: 403 });
+      return NextResponse.json(
+        { error: "只能操作自己发布的帖子" },
+        { status: 403 }
+      );
     }
     if (!post.lostItemId) {
-      return NextResponse.json({ error: "该帖子没有关联失物记录" }, { status: 400 });
+      return NextResponse.json(
+        { error: "该帖子没有关联失物记录" },
+        { status: 400 }
+      );
     }
     const closed = await closeOwnItem(session.user.id, null, post.lostItemId);
     if (!closed) {
-      return NextResponse.json({ error: "失物记录已是关闭状态" }, { status: 400 });
+      return NextResponse.json(
+        { error: "失物记录已是关闭状态" },
+        { status: 400 }
+      );
     }
     const updated = await getForumPostById(postId);
-    return NextResponse.json({ post: updated ? publicPost(updated, session.user.id) : null });
+    return NextResponse.json({
+      post: updated ? publicPost(updated, session.user.id) : null,
+    });
   }
 
   const parsed = postSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "请把标题和内容写完整" }, { status: 400 });
+    return NextResponse.json(
+      { error: "请把标题和内容写完整" },
+      { status: 400 }
+    );
   }
 
   const updated = await updateForumPost({
@@ -133,7 +169,10 @@ export async function PATCH(request: Request) {
     userId: session.user.id,
   });
   if (!updated) {
-    return NextResponse.json({ error: "只能修改自己发布的帖子" }, { status: 403 });
+    return NextResponse.json(
+      { error: "只能修改自己发布的帖子" },
+      { status: 403 }
+    );
   }
 
   return NextResponse.json({ post: publicPost(updated, session.user.id) });
@@ -153,7 +192,10 @@ export async function DELETE(request: Request) {
 
   const removed = await deleteForumPost(postId, session.user.id);
   if (!removed) {
-    return NextResponse.json({ error: "只能删除自己发布的帖子" }, { status: 403 });
+    return NextResponse.json(
+      { error: "只能删除自己发布的帖子" },
+      { status: 403 }
+    );
   }
 
   return NextResponse.json({ ok: true });

@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { createDatabase } from "@/lib/db/client";
-import type { ForumComment } from "./forum-shared";
 import { ensureForum, getForumPostById } from "./forum";
+import type { ForumComment } from "./forum-shared";
 
 const readyByDb = new WeakMap<object, Promise<void>>();
 
@@ -26,7 +26,9 @@ export async function ensureForumComments() {
           "createdAt" timestamp NOT NULL DEFAULT now()
         )
       `);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS "ForumComment_post" ON "ForumComment" ("postId")`);
+      await db.execute(
+        sql`CREATE INDEX IF NOT EXISTS "ForumComment_post" ON "ForumComment" ("postId")`
+      );
     })().catch((error) => {
       readyByDb.delete(db);
       throw error;
@@ -36,7 +38,9 @@ export async function ensureForumComments() {
   return ready;
 }
 
-export async function listForumComments(postId: string): Promise<ForumComment[]> {
+export async function listForumComments(
+  postId: string
+): Promise<ForumComment[]> {
   await ensureForumComments();
   const db = await createDatabase();
   return rowsOf(
@@ -49,12 +53,19 @@ export async function listForumComments(postId: string): Promise<ForumComment[]>
   );
 }
 
-export async function countForumComments(postIds: string[]): Promise<Map<string, number>> {
+export async function countForumComments(
+  postIds: string[]
+): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
-  if (postIds.length === 0) return counts;
+  if (postIds.length === 0) {
+    return counts;
+  }
   await ensureForumComments();
   const db = await createDatabase();
-  const ids = sql.join(postIds.map((id) => sql`${id}`), sql`, `);
+  const ids = sql.join(
+    postIds.map((id) => sql`${id}`),
+    sql`, `
+  );
   const rows = (await db.execute(sql`
     SELECT "postId", COUNT(*)::int AS "count"
     FROM "ForumComment" WHERE "postId" IN (${ids})
@@ -64,6 +75,53 @@ export async function countForumComments(postIds: string[]): Promise<Map<string,
     counts.set(row.postId, row.count);
   }
   return counts;
+}
+
+export type ForumCommentStats = {
+  count: number;
+  lastReplyAt: string | null;
+  lastReplyAuthor: string | null;
+};
+
+/** 一次聚合出评论数 + 最后一条回复，供列表页脚注使用 */
+export async function forumCommentStats(
+  postIds: string[]
+): Promise<Map<string, ForumCommentStats>> {
+  const stats = new Map<string, ForumCommentStats>();
+  if (postIds.length === 0) {
+    return stats;
+  }
+  await ensureForumComments();
+  const db = await createDatabase();
+  const ids = sql.join(
+    postIds.map((id) => sql`${id}`),
+    sql`, `
+  );
+  const rows = (await db.execute(sql`
+    SELECT "postId", "count", "lastAt", "lastAuthor" FROM (
+      SELECT "postId" AS "postId",
+             "author" AS "lastAuthor",
+             "createdAt" AS "lastAt",
+             COUNT(*) OVER (PARTITION BY "postId")::int AS "count",
+             ROW_NUMBER() OVER (PARTITION BY "postId" ORDER BY "createdAt" DESC) AS "rn"
+      FROM "ForumComment" WHERE "postId" IN (${ids})
+    ) ranked WHERE "rn" = 1
+  `)) as unknown as {
+    rows: {
+      postId: string;
+      count: number;
+      lastAt: Date | string | null;
+      lastAuthor: string | null;
+    }[];
+  };
+  for (const row of rows.rows ?? []) {
+    stats.set(row.postId, {
+      count: row.count,
+      lastReplyAt: row.lastAt ? new Date(row.lastAt).toISOString() : null,
+      lastReplyAuthor: row.lastAuthor,
+    });
+  }
+  return stats;
 }
 
 export async function createForumComment(input: {
@@ -82,7 +140,9 @@ export async function createForumComment(input: {
   let parentId = input.parentId ?? null;
   if (parentId) {
     const parents = rowsOf(
-      await db.execute(sql`SELECT "id", "parentId" FROM "ForumComment" WHERE "id" = ${parentId} AND "postId" = ${input.postId} LIMIT 1`)
+      await db.execute(
+        sql`SELECT "id", "parentId" FROM "ForumComment" WHERE "id" = ${parentId} AND "postId" = ${input.postId} LIMIT 1`
+      )
     );
     const parent = parents[0];
     if (!parent) {

@@ -18,6 +18,8 @@ import { DEEPSEEK_MODEL, getLanguageModel, hasModelProvider } from "@/lib/ai/pro
 import { createDocument } from "@/lib/ai/tools/create-document";
 import { editDocument } from "@/lib/ai/tools/edit-document";
 import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
+import { imageTools } from "@/lib/ai/tools/search-images";
+import { newsTools } from "@/lib/ai/tools/search-news";
 import { updateDocument } from "@/lib/ai/tools/update-document";
 import { logCampusTrace, runCampusEngine } from "@/lib/campus/engine";
 import { PRODUCT_NAME } from "@/lib/brand";
@@ -276,7 +278,7 @@ export async function POST(request: Request) {
             ? `你的名字是${PRODUCT_NAME}。请依据下面的知识库检索结果，用自然、简洁的中文回答用户问题：可以适当归纳分点，但不要编造知识库里没有的信息；不要照抄"Q:""A:"的原始问答格式；回答末尾用（来源：文档名）标注来源。不要声称执行了任何操作。\n\n===== 知识库检索结果 =====\n${ragContext}\n===== 知识库检索结果结束 =====`
             : ragContext
               ? `你的名字是${PRODUCT_NAME}。下面是本地知识库的检索结果，请自行判断它们与用户问题是否相关：相关时优先依据知识库内容回答并在回答末尾标注来源文档名；不相关时完全忽略知识库内容，正常回答一般问题。不要声称执行了任何操作。\n\n===== 知识库检索结果 =====\n${ragContext}\n===== 知识库检索结果结束 =====`
-              : `你的名字是${PRODUCT_NAME}。对闲聊或一般问题自然回答；没有资料时不要声称知道校园实时事实，也不要声称执行了任何操作。`;
+              : `你的名字是${PRODUCT_NAME}。对闲聊或一般问题自然回答；没有资料时不要声称知道校园实时事实，也不要声称执行了任何操作。用户要找图片、找配图时调用 searchImages，用户挑中某一张后再调用 grabImage 保存到本站，不要一次保存多张。用户问最近有什么新闻、某个话题的报道时调用 searchNews，引用时注明来源媒体，不要把外部新闻说成校园官方信息。`;
           const general = streamText({
             model: getLanguageModel(chatModel) as Parameters<typeof streamText>[0]["model"],
             system: systemPrompt,
@@ -288,6 +290,8 @@ export async function POST(request: Request) {
             },
             onError: () => report({ id: "model", label: "回答生成失败", state: "error" }),
             tools: {
+              ...imageTools(),
+              ...newsTools(),
               createDocument: createDocument({ dataStream, modelId: chatModel, session }),
               editDocument: editDocument({ dataStream, session }),
               requestSuggestions: requestSuggestions({ dataStream, modelId: chatModel, session }),

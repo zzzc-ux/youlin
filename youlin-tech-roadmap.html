@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>有邻 · 项目技术路线图</title>
+<style>
+  :root{
+    --bg:#08182b;
+    --bg2:#0b2038;
+    --panel:rgba(16,40,66,.72);
+    --line:rgba(92,150,220,.22);
+    --line-strong:rgba(92,150,220,.4);
+    --cyan:#38e1c4;
+    --blue:#4c8dff;
+    --amber:#ffb443;
+    --text:#e6f1ff;
+    --muted:#8aa6c6;
+    --muted2:#64809f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1100px 520px at 12% -8%, rgba(76,141,255,.16), transparent 62%),
+      radial-gradient(900px 520px at 92% 4%, rgba(56,225,196,.10), transparent 58%),
+      var(--bg);
+    color:var(--text);
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB","Source Han Sans SC",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:44px 40px 56px;
+  }
+  body::before{
+    content:"";
+    position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:
+      linear-gradient(rgba(92,150,220,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(92,150,220,.07) 1px, transparent 1px);
+    background-size:44px 44px;
+    mask-image:radial-gradient(circle at 50% 22%, #000 0%, transparent 82%);
+  }
+  .wrap{position:relative;z-index:1;max-width:1320px;margin:0 auto;}
+
+  /* ---------- header ---------- */
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:32px;padding-bottom:26px;border-bottom:1px solid var(--line);}
+  .kicker{font-size:11px;letter-spacing:.34em;color:var(--cyan);text-transform:uppercase;margin-bottom:14px;font-weight:600;}
+  h1{margin:0;font-size:36px;line-height:1.15;font-weight:700;letter-spacing:.01em;}
+  h1 span{color:var(--cyan);}
+  .sub{margin:12px 0 0;font-size:13.5px;color:var(--muted);line-height:1.7;max-width:660px;}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;max-width:400px;}
+  .tag{font-size:11.5px;padding:5px 11px;border:1px solid var(--line-strong);border-radius:999px;color:var(--muted);background:rgba(76,141,255,.07);white-space:nowrap;}
+  .tag b{color:var(--text);font-weight:600;}
+
+  /* ---------- section ---------- */
+  section{margin-top:36px;}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:18px;}
+  .sec-num{font-size:11px;letter-spacing:.22em;color:var(--blue);font-weight:700;padding-top:2px;}
+  h2{margin:0;font-size:17px;font-weight:650;letter-spacing:.02em;}
+  .sec-desc{font-size:12.5px;color:var(--muted2);margin-left:auto;}
+
+  /* ---------- layer stack ---------- */
+  .stack{display:flex;flex-direction:column;gap:9px;}
+  .layer{
+    display:grid;grid-template-columns:206px 1fr;gap:0;
+    border:1px solid var(--line);border-radius:10px;
+    background:linear-gradient(100deg, rgba(20,48,78,.85), rgba(13,32,54,.6));
+    overflow:hidden;position:relative;
+  }
+  .layer::after{
+    content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:linear-gradient(180deg,var(--blue),transparent);
+    opacity:.75;
+  }
+  .layer.accent-cyan::after{background:linear-gradient(180deg,var(--cyan),transparent);}
+  .layer.accent-amber::after{background:linear-gradient(180deg,var(--amber),transparent);}
+  .lname{padding:16px 18px 16px 22px;border-right:1px solid var(--line);}
+  .lname .idx{font-size:10px;letter-spacing:.2em;color:var(--muted2);font-weight:700;}
+  .lname .cn{font-size:14.5px;font-weight:650;margin-top:5px;letter-spacing:.01em;}
+  .lname .en{font-size:10.5px;color:var(--muted2);letter-spacing:.08em;margin-top:3px;text-transform:uppercase;}
+  .lbody{padding:13px 16px;display:flex;flex-wrap:wrap;gap:7px;align-items:center;}
+  .chip{
+    font-size:12px;padding:6px 11px;border-radius:6px;
+    border:1px solid rgba(92,150,220,.26);
+    background:rgba(76,141,255,.09);
+    color:#cfe2fa;line-height:1.35;
+  }
+  .chip.hot{border-color:rgba(56,225,196,.42);background:rgba(56,225,196,.10);color:#b8f4e8;}
+  .chip.warm{border-color:rgba(255,180,67,.38);background:rgba(255,180,67,.09);color:#ffd9a1;}
+  .chip small{color:var(--muted2);font-size:10.5px;margin-left:5px;}
+  .note{width:100%;font-size:11.5px;color:var(--muted2);line-height:1.65;margin-top:2px;}
+  .note code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:#8fd8ff;background:rgba(76,141,255,.12);padding:1px 5px;border-radius:3px;}
+
+  /* ---------- flow ---------- */
+  .flow{
+    border:1px solid var(--line);border-radius:10px;
+    background:rgba(12,30,50,.6);padding:20px 18px;
+  }
+  .steps{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:4px;}
+  .step{flex:1 1 0;min-width:126px;padding:0 10px;position:relative;}
+  .step:not(:last-child)::after{
+    content:"";position:absolute;right:-5px;top:26px;width:10px;height:10px;
+    border-top:1.5px solid rgba(56,225,196,.55);border-right:1.5px solid rgba(56,225,196,.55);
+    transform:rotate(45deg);
+  }
+  .step .dot{
+    width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:10.5px;font-weight:700;color:#06202f;
+    background:linear-gradient(135deg,var(--cyan),#2aa8ff);
+    margin-bottom:11px;box-shadow:0 0 18px rgba(56,225,196,.32);
+  }
+  .step h4{margin:0 0 5px;font-size:12.5px;font-weight:650;letter-spacing:.01em;}
+  .step p{margin:0;font-size:11px;color:var(--muted2);line-height:1.6;}
+  .step code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:var(--cyan);background:rgba(56,225,196,.09);padding:1px 4px;border-radius:3px;}
+  .flow-foot{margin-top:16px;padding-top:13px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--muted2);line-height:1.7;}
+  .flow-foot b{color:#cfe2fa;font-weight:600;}
+
+  /* ---------- phases ---------- */
+  .phases{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
+  .phase{
+    border:1px solid var(--line);border-radius:10px;padding:16px 15px 15px;
+    background:linear-gradient(180deg, rgba(20,48,78,.78), rgba(11,28,47,.55));
+    position:relative;overflow:hidden;
+  }
+  .phase::before{
+    content:"";position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,var(--blue),var(--cyan));
+    opacity:.85;
+  }
+  .phase.done::before{background:linear-gradient(90deg,var(--cyan),#7ff0d6);}
+  .phase .p-id{font-size:10px;letter-spacing:.2em;color:var(--cyan);font-weight:700;}
+  .phase h3{margin:8px 0 4px;font-size:13.5px;font-weight:650;}
+  .phase .p-sub{font-size:11px;color:var(--muted2);margin-bottom:11px;line-height:1.5;}
+  .phase ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;}
+  .phase li{font-size:11.5px;color:#bed3ea;line-height:1.5;padding-left:13px;position:relative;}
+  .phase li::before{content:"";position:absolute;left:0;top:6px;width:5px;height:5px;border-radius:50%;background:var(--blue);opacity:.85;}
+  .phase.done li::before{background:var(--cyan);}
+  .phase .state{
+    display:inline-block;margin-top:12px;font-size:10px;letter-spacing:.12em;
+    padding:3px 8px;border-radius:4px;font-weight:700;
+  }
+  .state.now{color:#062b24;background:var(--cyan);}
+  .state.next{color:var(--amber);background:rgba(255,180,67,.13);border:1px solid rgba(255,180,67,.35);}
+  .state.old{color:#9fe9ff;background:rgba(76,141,255,.16);border:1px solid rgba(76,141,255,.3);}
+
+  /* ---------- debt ---------- */
+  .debt{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+  .item{
+    display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;
+    border:1px solid var(--line);border-left:2px solid rgba(255,180,67,.6);
+    border-radius:8px;padding:13px 15px;background:rgba(14,34,55,.55);
+  }
+  .item .lv{font-size:9.5px;letter-spacing:.1em;font-weight:700;color:var(--amber);border:1px solid rgba(255,180,67,.4);border-radius:4px;padding:2px 6px;white-space:nowrap;margin-top:1px;}
+  .item h4{margin:0 0 4px;font-size:12.5px;font-weight:600;}
+  .item p{margin:0;font-size:11px;color:var(--muted2);line-height:1.65;}
+  .item p code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:#8fd8ff;background:rgba(76,141,255,.12);padding:1px 5px;border-radius:3px;}
+
+  footer{margin-top:38px;padding-top:18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;font-size:11px;color:var(--muted2);letter-spacing:.04em;}
+
+  @media (max-width:1080px){
+    body{padding:28px 20px 40px;}
+    .layer{grid-template-columns:1fr;}
+    .lname{border-right:none;border-bottom:1px solid var(--line);}
+    .phases{grid-template-columns:repeat(2,1fr);}
+    .debt{grid-template-columns:1fr;}
+    header{flex-direction:column;align-items:flex-start;}
+    .meta{justify-content:flex-start;}
+  }
+  @media print{
+    body{background:#fff;color:#111;padding:16px;}
+    body::before{display:none;}
+    .layer,.flow,.phase,.item{background:#fff;border-color:#ccc;}
+    .chip{background:#f4f7fb;color:#22364d;border-color:#d5e0ec;}
+    h1,.lname .cn,.step h4{color:#0b2038;}
+    .sub,.note,.step p,.phase li,.item p{color:#4b6178;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <div class="kicker">YouLin · Technical Roadmap</div>
+      <h1>有邻 校园 AI 助手<span> · 技术路线图</span></h1>
+      <p class="sub">以「对话即入口」重构校园服务：一条对话链路串起问答、失物招领、校园论坛与宿舍报修，业务规则与模型能力分层解耦，模型不可用时仍可降级运行。</p>
+    </div>
+    <div class="meta">
+      <div class="tag">版本 <b>v3.1.0</b></div>
+      <div class="tag">Next.js <b>16</b></div>
+      <div class="tag">React <b>19</b></div>
+      <div class="tag">AI SDK <b>7</b></div>
+      <div class="tag">DeepSeek <b>兼容接入</b></div>
+      <div class="tag">Drizzle + <b>PGlite</b></div>
+    </div>
+  </header>
+
+  <!-- 1. 分层架构 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">01</div>
+      <h2>分层架构</h2>
+      <div class="sec-desc">自下而上六层，上层只依赖下层契约，模型与数据可替换</div>
+    </div>
+
+    <div class="stack">
+
+      <div class="layer accent-cyan">
+        <div class="lname">
+          <div class="idx">L6</div>
+          <div class="cn">应用层</div>
+          <div class="en">Application</div>
+        </div>
+        <div class="lbody">
+          <span class="chip hot">校园问答</span>
+          <span class="chip hot">失物招领</span>
+          <span class="chip hot">校园论坛</span>
+          <span class="chip hot">宿舍报修</span>
+          <span class="chip hot">校园卡 / 门禁</span>
+          <span class="note">Next.js App Router 路由分组 <code>(chat)</code> + <code>(auth)</code>；Streamdown 流式 Markdown、CodeMirror、ProseMirror 编辑器、Framer Motion 动效、Radix UI + Tailwind 4 组件体系。</span>
+        </div>
+      </div>
+
+      <div class="layer">
+        <div class="lname">
+          <div class="idx">L5</div>
+          <div class="cn">身份与防护</div>
+          <div class="en">Identity &amp; Guard</div>
+        </div>
+        <div class="lbody">
+          <span class="chip">NextAuth v5 会话</span>
+          <span class="chip">bcrypt-ts 口令散列</span>
+          <span class="chip">botid 机器人识别</span>
+          <span class="chip">接口限流</span>
+          <span class="chip">文件上传</span>
+          <span class="chip">proxy 路由守卫</span>
+          <span class="note">所有 <code>/api/chat</code>、<code>/api/forum</code>、<code>/api/files</code> 入口统一过鉴权与速率限制；上传落 <code>public/uploads</code> 或 Vercel Blob。</span>
+        </div>
+      </div>
+
+      <div class="layer accent-cyan">
+        <div class="lname">
+          <div class="idx">L4</div>
+          <div class="cn">AI 编排层</div>
+          <div class="en">Orchestration</div>
+        </div>
+        <div class="lbody">
+          <span class="chip hot">AI SDK 7 流式生成</span>
+          <span class="chip hot">DeepSeek（OpenAI 兼容）</span>
+          <span class="chip">resumable-stream 断线续传</span>
+          <span class="chip">模型路由与降级</span>
+          <span class="chip">Prompt 注册表</span>
+          <span class="chip">会话标题生成</span>
+          <span class="chip">OpenTelemetry 追踪</span>
+          <span class="note">统一从 <code>providers.ts</code> 取模型：有 Key 走 DeepSeek，无 Key 自动回退本地占位模型；测试环境注入 Mock Provider。</span>
+        </div>
+      </div>
+
+      <div class="layer">
+        <div class="lname">
+          <div class="idx">L3</div>
+          <div class="cn">校园业务引擎</div>
+          <div class="en">Domain Engine</div>
+        </div>
+        <div class="lbody">
+          <span class="chip">意图分类 <small>8 类</small></span>
+          <span class="chip">工具策略 <small>7 读 / 4 写</small></span>
+          <span class="chip">单一路径编排执行</span>
+          <span class="chip">Trace 步骤回传</span>
+          <span class="chip">失物匹配</span>
+          <span class="chip">论坛草稿生成</span>
+          <span class="chip">语义帖匹配 + 关键词兜底</span>
+          <span class="chip warm">隐私脱敏</span>
+          <span class="note"><code>engine.ts</code> 是全项目唯一执行路径：分类 → 工具白名单 → 参数校验 → 写入前预览确认 → 执行 → 生成答复；读操作可直接执行，写操作必须二次确认。</span>
+        </div>
+      </div>
+
+      <div class="layer">
+        <div class="lname">
+          <div class="idx">L2</div>
+          <div class="cn">知识检索</div>
+          <div class="en">RAG Pipeline</div>
+        </div>
+        <div class="lbody">
+          <span class="chip">文档装载</span>
+          <span class="chip">文本切块</span>
+          <span class="chip">向量嵌入</span>
+          <span class="chip">向量库存储</span>
+          <span class="chip">相似度检索</span>
+          <span class="chip">PDF 解析 <small>unpdf</small></span>
+          <span class="chip">检索 CLI</span>
+          <span class="note">校园规章、办事指南、通知公告经 pipeline 入库，问答时先检索再生成，减少模型臆造。</span>
+        </div>
+      </div>
+
+      <div class="layer accent-amber">
+        <div class="lname">
+          <div class="idx">L1</div>
+          <div class="cn">数据与基础设施</div>
+          <div class="en">Data &amp; Infra</div>
+        </div>
+        <div class="lbody">
+          <span class="chip">Drizzle ORM</span>
+          <span class="chip">Schema 版本化迁移</span>
+          <span class="chip">PGlite 零配置本地库</span>
+          <span class="chip">PostgreSQL 可选</span>
+          <span class="chip">Redis 限流</span>
+          <span class="chip">Vercel 部署</span>
+          <span class="note">无 <code>POSTGRES_URL</code> 时落到 <code>data/campus-db</code>，开箱即用；配置连接串即切生产库，代码零改动。</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 2. 关键链路 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">02</div>
+      <h2>关键链路：一次校园请求如何被处理</h2>
+      <div class="sec-desc">可解释、可审计、写操作强确认</div>
+    </div>
+
+    <div class="flow">
+      <div class="steps">
+        <div class="step">
+          <div class="dot">1</div>
+          <h4>接收输入</h4>
+          <p>会话鉴权 + 限流，取最近上下文</p>
+        </div>
+        <div class="step">
+          <div class="dot">2</div>
+          <h4>意图分类</h4>
+          <p><code>classifyCampus</code> 落到 8 类之一，含指代消解</p>
+        </div>
+        <div class="step">
+          <div class="dot">3</div>
+          <h4>策略判定</h4>
+          <p><code>toolPolicy</code> 决定读或写，写操作强制预览</p>
+        </div>
+        <div class="step">
+          <div class="dot">4</div>
+          <h4>执行工具</h4>
+          <p>论坛 / 失物 / 通知 / 报修 / 卡务 / 门禁</p>
+        </div>
+        <div class="step">
+          <div class="dot">5</div>
+          <h4>数据读写</h4>
+          <p>Drizzle 事务写入，隐私字段脱敏后公开</p>
+        </div>
+        <div class="step">
+          <div class="dot">6</div>
+          <h4>生成答复</h4>
+          <p>LLM 优先，失败回退规则模板</p>
+        </div>
+        <div class="step">
+          <div class="dot">7</div>
+          <h4>流式返回</h4>
+          <p>前端实时渲染 + Trace 步骤展示</p>
+        </div>
+      </div>
+      <div class="flow-foot">
+        <b>设计要点：</b>业务判定不交给模型 —— 模型只负责「理解说什么」和「组织怎么说」，<b>写什么、能不能写</b> 由工具策略与参数校验决定；每一次工具调用都以 Trace 步骤的形式展示给用户，处理过程透明可回溯。
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 演进阶段 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">03</div>
+      <h2>技术演进阶段</h2>
+      <div class="sec-desc">先跑通闭环，再叠智能，最后补治理</div>
+    </div>
+
+    <div class="phases">
+      <div class="phase done">
+        <div class="p-id">PHASE 0</div>
+        <h3>工程骨架</h3>
+        <div class="p-sub">可运行、可登录、可存数据</div>
+        <ul>
+          <li>Next.js 16 + React 19 基线</li>
+          <li>NextAuth v5 账号体系</li>
+          <li>Drizzle + PGlite 零配置库</li>
+          <li>Tailwind 4 设计系统</li>
+        </ul>
+        <span class="state old">已落地</span>
+      </div>
+
+      <div class="phase done">
+        <div class="p-id">PHASE 1</div>
+        <h3>场景建模</h3>
+        <div class="p-sub">把校园事务抽象成工具</div>
+        <ul>
+          <li>8 类意图分类体系</li>
+          <li>11 个校园工具与读写策略</li>
+          <li>失物登记 → 论坛发布 → 归还闭环</li>
+          <li>站内消息与认领流程</li>
+        </ul>
+        <span class="state old">已落地</span>
+      </div>
+
+      <div class="phase done">
+        <div class="p-id">PHASE 2</div>
+        <h3>对话智能化</h3>
+        <div class="p-sub">从规则匹配走向语义理解</div>
+        <ul>
+          <li>AI SDK 7 + DeepSeek 接入</li>
+          <li>流式生成与断线续传</li>
+          <li>论坛草稿 / 语义帖匹配</li>
+          <li>无 Key 时本地模型降级</li>
+        </ul>
+        <span class="state now">当前阶段</span>
+      </div>
+
+      <div class="phase">
+        <div class="p-id">PHASE 3</div>
+        <h3>知识增强</h3>
+        <div class="p-sub">让答复有据可依</div>
+        <ul>
+          <li>校园文档切块与嵌入</li>
+          <li>向量库与检索评测</li>
+          <li>检索结果引用与溯源</li>
+          <li>PDF 规章批量入库</li>
+        </ul>
+        <span class="state next">进行中</span>
+      </div>
+
+      <div class="phase">
+        <div class="p-id">PHASE 4</div>
+        <h3>治理与上线</h3>
+        <div class="p-sub">从本机演示到真实可用</div>
+        <ul>
+          <li>类型收敛与生产构建通过</li>
+          <li>E2E 全流程回归</li>
+          <li>隐私审核与内容治理</li>
+          <li>PostgreSQL + 公网部署验证</li>
+        </ul>
+        <span class="state next">待推进</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. 技术债 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">04</div>
+      <h2>已知技术债与下一步动作</h2>
+      <div class="sec-desc">按「阻塞上线 → 影响体验 → 长期演进」排序</div>
+    </div>
+
+    <div class="debt">
+      <div class="item">
+        <div class="lv">P0</div>
+        <div>
+          <h4>TypeScript 类型未收敛</h4>
+          <p>AI SDK 依赖版本存在类型差异，Three.js 类型报错，导致 <code>pnpm build</code> 无法保证通过。</p>
+        </div>
+      </div>
+      <div class="item">
+        <div class="lv">P0</div>
+        <div>
+          <h4>生产构建与公网部署未验证</h4>
+          <p>当前仅保证本机开发模式可跑通，PostgreSQL 路径与公网部署缺少端到端验证。</p>
+        </div>
+      </div>
+      <div class="item">
+        <div class="lv">P1</div>
+        <div>
+          <h4>报修工单为内存态</h4>
+          <p>工单存在进程内存，重启即丢，也未对接学校真实报修系统，需落库并补状态机。</p>
+        </div>
+      </div>
+      <div class="item">
+        <div class="lv">P1</div>
+        <div>
+          <h4>站内消息无主动通知</h4>
+          <p>依赖用户手动刷新，需补轮询或 SSE 推送，否则交接链路容易断。</p>
+        </div>
+      </div>
+      <div class="item">
+        <div class="lv">P2</div>
+        <div>
+          <h4>自动隐私识别不完整</h4>
+          <p>证件号、验证码、学号等敏感信息识别有遗漏，公开发布前需人工复核兜底。</p>
+        </div>
+      </div>
+      <div class="item">
+        <div class="lv">P2</div>
+        <div>
+          <h4>静态样例数据需替换</h4>
+          <p>校园通知、余额、开放时间等为代码内样本，真实上线需接入校方数据源。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div>有邻 YouLin · 校园 AI 助手 · 技术路线图</div>
+    <div>Next.js 16 / React 19 / AI SDK 7 / DeepSeek / Drizzle + PGlite / RAG</div>
+  </footer>
+
+</div>
+</body>
+</html>

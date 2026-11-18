@@ -1,4 +1,11 @@
-export const forumCategories = ["活动", "讲座", "社团", "招领", "求助", "闲置"] as const;
+export const forumCategories = [
+  "活动",
+  "讲座",
+  "社团",
+  "招领",
+  "求助",
+  "闲置",
+] as const;
 
 export type ForumCategory = (typeof forumCategories)[number];
 
@@ -18,6 +25,10 @@ export type ForumPost = {
   mine?: boolean;
   /** 服务端计算：该帖评论数 */
   commentCount?: number;
+  /** 服务端计算：最后一条回复时间 */
+  lastReplyAt?: string | null;
+  /** 服务端计算：最后一条回复的作者 */
+  lastReplyAuthor?: string | null;
 };
 
 export type ForumComment = {
